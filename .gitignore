@@ -29,3 +29,5 @@ spark/metastore_db
 spark/spark-warehouse
 spark/derby.log
 spark/test
+# Python virtualenv
+.venv/
