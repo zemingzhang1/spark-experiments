@@ -112,6 +112,19 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
 .tstep .t1 { font-size: 10.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.05em; }
 .tstep .t2 { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg); }
 .tstrip .arw { color: var(--fg-3); font-size: 13px; }
+.pmap { display: flex; flex-direction: column; gap: 16px; }
+.prow .plab { font-size: 12.5px; font-weight: 600; margin-bottom: 7px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.prow .plab .psub { font-weight: 400; font-size: 11.5px; color: var(--fg-3); }
+.prow.before .plab { color: var(--hot); }
+.prow.after .plab { color: var(--cool); }
+.pcells { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+.pcell {
+  font-family: var(--font-mono); font-size: 10.5px; text-align: center;
+  padding: 7px 2px; border-radius: 4px; border: 1px solid transparent;
+  color: var(--fg); overflow: hidden; white-space: nowrap; cursor: default;
+}
+.pcell.empty { border: 1px dashed var(--line-strong); color: var(--fg-3); background: none; }
+.pcell.hot { color: #fff; }
 .plot { width: 100%; height: 240px; }
 .flag { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; background: var(--hot-soft); border: 1px solid var(--hot); color: var(--fg); border-radius: 8px; padding: 9px 12px; }
 .flag b { color: var(--hot); font-weight: 600; }
@@ -338,7 +351,8 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
                       hint: "how the data is laid out on the way in",
                       onChange: function (v) { set("partsBefore", v); } }),
           h(Slider, { id: "parts", label: "Shuffle partitions after", min: 2, max: 200, value: raw.parts,
-                      display: String(cfg.P), hint: "spark.sql.shuffle.partitions — Spark's default is 200",
+                      display: String(cfg.P),
+                      hint: "spark.sql.shuffle.partitions — aim for 100–200MB of shuffle data each, rounded to a multiple of your executor cores",
                       onChange: function (v) { set("parts", v); } }),
           h(Slider, { id: "salts", label: "Salt range", min: 1, max: 100, value: raw.salts,
                       display: cfg.S === 1 ? "none" : "0–" + (cfg.S - 1),
@@ -379,6 +393,56 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
         h("span", { className: "v " + t.c }, t.v),
         h("span", { className: "n" }, t.n));
     }));
+  }
+
+  /* ---------- partition map ----------
+     The Sankey can only draw partitions that carry rows. This shows every
+     partition you configured, so an empty one is visible as an empty one. */
+  function PartitionRow(props) {
+    var loads = props.loads, count = props.count, valuesAt = props.valuesAt;
+    var max = 1, p;
+    for (p = 0; p < count; p++) { if (loads[p] > max) { max = loads[p]; } }
+    var live = 0;
+    for (p = 0; p < count; p++) { if (loads[p] > 0) { live++; } }
+    var cells = [];
+    for (p = 0; p < count; p++) {
+      var rows = loads[p] || 0;
+      var t = rows / max;
+      var vs = valuesAt ? (valuesAt[p] || []) : null;
+      var tip = "p" + p + (rows
+        ? " · " + fmt(rows) + " rows" +
+          (vs && vs.length ? " · value" + (vs.length === 1 ? " " : "s ") + vs.join(", ") : "")
+        : " · empty");
+      cells.push(h("div", {
+        key: p,
+        className: "pcell" + (rows ? (t > 0.55 ? " hot" : "") : " empty"),
+        style: rows ? { background: "hsla(214, 74%, 52%, " + (0.16 + 0.84 * t).toFixed(3) + ")" } : null,
+        title: tip
+      }, "p" + p));
+    }
+    return h("div", { className: "prow " + props.tone },
+      h("div", { className: "plab" }, props.label,
+        h("span", { className: "psub" },
+          (props.extra ? props.extra + " · " : "") +
+          live + " of " + count + " partitions hold rows · hover a cell for detail")),
+      h("div", { className: "pcells" }, cells));
+  }
+
+  function PartitionMap(props) {
+    var cfg = props.cfg, sim = props.sim;
+    /* at high skew the long-tail values round down to no rows at all, so they
+       reach no partition — worth saying outright, since it looks like a bug */
+    var withRows = sim.counts.filter(function (c) { return c > 0; }).length;
+    var extra = cfg.V + " values" + (withRows < cfg.V ? ", only " + withRows + " with rows" : "");
+    return h("section", { className: "card", style: { padding: "16px" } },
+      h("div", { className: "sec-head" },
+        h("h2", null, "Partition map"),
+        h("span", { className: "note" }, "pmod(hash(key), partitions) — every partition, filled or not")),
+      h("div", { className: "pmap" },
+        h(PartitionRow, { label: "Before salting", tone: "before", loads: sim.noSalt,
+                          count: cfg.PB, valuesAt: sim.valuesAt, extra: extra }),
+        h(PartitionRow, { label: "After salting", tone: "after", loads: sim.salted,
+                          count: cfg.P, valuesAt: null })));
   }
 
   /* ---------- before / after flow ---------- */
@@ -725,6 +789,7 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
             h("span", null, cfg.V + " values × " + cfg.S + " salts gives " + distinct +
               " distinct keys for " + cfg.P + " partitions. Raise the salt range until there are at least a few keys per partition."))
         : null,
+      h(PartitionMap, { cfg: cfg, sim: sim }),
       h(FlowSankey, { cfg: cfg, sim: sim, tok: tok }),
       h(RowsPerValue, { cfg: cfg, sim: sim, tok: tok }),
       h(PipelineCanvas, { cfg: cfg }),
@@ -736,6 +801,10 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
           " together. Skip the explode and the salted rows match nothing."),
         h("p", null, h("b", null, "The salt range is a trade."),
           " It multiplies the small side by S, so a wide salt range buys even partitions at the cost of a bigger broadcast or shuffle on the other side."),
+        h("p", null, h("b", null, "Picking a shuffle partition count."),
+          " Divide the stage's shuffle size by a 100–200MB target, then round to a multiple of your total executor cores so none sit idle on the last wave. Spark's default of 200 is a historical constant, not a recommendation. Matching the count to the number of distinct values does not work: hashing still collides, so some partitions take several keys and others none — the partition map above shows it. With AQE on, set it generously and let ",
+          h("code", null, "spark.sql.adaptive.coalescePartitions.enabled"),
+          " shrink it to fit the data at runtime."),
         h("p", null, h("b", null, "Before reaching for salt,"), " try AQE — ",
           h("code", null, "spark.sql.adaptive.skewJoin.enabled"),
           " splits skewed partitions on its own, and a broadcast join avoids the shuffle entirely when one side fits in memory.")));
