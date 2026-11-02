@@ -1,0 +1,753 @@
+<title>Salt Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: config panel, metric strip, the before/after Sankey, rows per value, then a pannable pipeline canvas */
+:root {
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --surface-2: #eeeeea;
+  --line: #dcdad3;
+  --line-strong: #bfbdb4;
+  --fg: #16181b;
+  --fg-2: #52565c;
+  --fg-3: #8b8e94;
+  --hot: #c85a1b;
+  --hot-soft: #fbeade;
+  --cool: #2a67c9;
+  --cool-soft: #e7effb;
+  --good: #1d8159;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111214;
+    --surface: #191b1e;
+    --surface-2: #212429;
+    --line: #2d3036;
+    --line-strong: #3f434a;
+    --fg: #ecedef;
+    --fg-2: #a6aab0;
+    --fg-3: #74787e;
+    --hot: #e8853f;
+    --hot-soft: #2e2017;
+    --cool: #5d9bf2;
+    --cool-soft: #16212f;
+    --good: #3fb184;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111214;
+  --surface: #191b1e;
+  --surface-2: #212429;
+  --line: #2d3036;
+  --line-strong: #3f434a;
+  --fg: #ecedef;
+  --fg-2: #a6aab0;
+  --fg-3: #74787e;
+  --hot: #e8853f;
+  --hot-soft: #2e2017;
+  --cool: #5d9bf2;
+  --cool-soft: #16212f;
+  --good: #3fb184;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 15px; line-height: 1.55; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+.sub { color: var(--fg-2); margin: 4px 0 0; font-size: 14px; max-width: 68ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fg-3); margin: 0 0 8px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.panel-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 16px; background: none; border: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--fg); text-align: left;
+}
+.panel-head:focus-visible { outline: 2px solid var(--cool); outline-offset: -2px; border-radius: 10px; }
+.chev { transition: transform .18s ease; color: var(--fg-3); font-size: 12px; }
+.chev.closed { transform: rotate(-90deg); }
+.panel-head .tally { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--fg-3); }
+.panel-body { padding: 4px 16px 18px; border-top: 1px solid var(--line); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 0 16px; }
+.preset {
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--fg-2);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 12px; cursor: pointer;
+}
+.preset:hover { border-color: var(--line-strong); color: var(--fg); }
+.preset[aria-pressed="true"] { background: var(--cool-soft); border-color: var(--cool); color: var(--cool); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px 22px; }
+.ctrl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ctrl .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ctrl label { font-size: 13px; color: var(--fg-2); font-weight: 500; }
+.ctrl .val { font-family: var(--font-mono); font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.ctrl .hint { font-size: 11.5px; color: var(--fg-3); }
+input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.tile .k { font-size: 12px; color: var(--fg-2); display: block; }
+.tile .v { font-family: var(--font-mono); font-size: 21px; font-weight: 500; font-variant-numeric: tabular-nums lining-nums; display: block; margin-top: 3px; }
+.tile .n { font-size: 11.5px; color: var(--fg-3); }
+.v.hot { color: var(--hot); }
+.v.cool { color: var(--cool); }
+.v.good { color: var(--good); }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+.sec-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.sec-head .note { font-size: 12.5px; color: var(--fg-3); margin-left: auto; }
+.flowhead { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: space-between; margin: 0 2px -2px; font-size: 12.5px; font-weight: 600; }
+.flowhead .fsub { font-weight: 400; font-size: 11.5px; color: var(--fg-3); margin-left: 8px; }
+.flowhead .b { color: var(--hot); }
+.flowhead .a { color: var(--cool); }
+.sankey { width: 100%; }
+.tstrip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin-top: 4px; }
+.tstep { background: var(--surface-2); border-radius: 6px; padding: 5px 10px; }
+.tstep .t1 { font-size: 10.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.tstep .t2 { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg); }
+.tstrip .arw { color: var(--fg-3); font-size: 13px; }
+.plot { width: 100%; height: 240px; }
+.flag { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; background: var(--hot-soft); border: 1px solid var(--hot); color: var(--fg); border-radius: 8px; padding: 9px 12px; }
+.flag b { color: var(--hot); font-weight: 600; }
+.canvas-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.canvas-bar .spacer { margin-left: auto; font-size: 12px; color: var(--fg-3); }
+.zbtn {
+  font-family: var(--font-mono); font-size: 13px; line-height: 1; color: var(--fg-2);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+  width: 28px; height: 28px; cursor: pointer; padding: 0;
+}
+.zbtn.wide { width: auto; padding: 0 10px; font-family: var(--font-sans); font-size: 12px; }
+.zbtn:hover { border-color: var(--line-strong); color: var(--fg); }
+.canvas-hold {
+  position: relative; width: 100%; aspect-ratio: 1280 / 620;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+}
+@media (max-width: 700px) { .canvas-hold { aspect-ratio: 1280 / 900; } }
+.canvas-hold svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.canvas-hold svg.dragging { cursor: grabbing; }
+.nd rect { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1; }
+.nd text { fill: var(--fg); font-family: var(--font-mono); font-size: 12px; }
+.nd.hot rect { fill: var(--hot-soft); stroke: var(--hot); }
+.nd.hot text { fill: var(--hot); }
+.nd.cool rect { fill: var(--cool-soft); stroke: var(--cool); }
+.nd.cool text { fill: var(--cool); }
+.lane rect { fill: none; stroke: var(--line); stroke-dasharray: 4 4; }
+.lane text { fill: var(--fg-3); font-family: var(--font-sans); font-size: 12px; font-weight: 500; }
+.cap { fill: var(--fg-3); font-family: var(--font-sans); font-size: 11px; }
+.flow { stroke: var(--line-strong); stroke-width: 1.4; fill: none; }
+.join rect { fill: var(--surface); stroke: var(--good); stroke-width: 1.5; }
+.join text { fill: var(--good); font-family: var(--font-sans); font-size: 13px; font-weight: 600; }
+.foot { font-size: 12.5px; color: var(--fg-3); max-width: 78ch; }
+.foot code { font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--fg-2); }
+.foot p { margin: 0 0 7px; }
+@media (max-width: 520px) { h1 { font-size: 22px; } }
+</style>
+
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var h = React.createElement;
+  var useState = React.useState, useMemo = React.useMemo, useRef = React.useRef, useEffect = React.useEffect;
+
+  /* ---------- Spark's hash ---------- */
+  var enc = new TextEncoder();
+  function rotl(x, r) { return (x << r) | (x >>> (32 - r)); }
+  function mixK1(k1) { k1 = Math.imul(k1, 0xcc9e2d51); k1 = rotl(k1, 15); return Math.imul(k1, 0x1b873593); }
+  function mixH1(h1, k1) { h1 ^= k1; h1 = rotl(h1, 13); return (Math.imul(h1, 5) + 0xe6546b64) | 0; }
+  function fmix(h1, len) {
+    h1 ^= len;
+    h1 ^= h1 >>> 16; h1 = Math.imul(h1, 0x85ebca6b);
+    h1 ^= h1 >>> 13; h1 = Math.imul(h1, 0xc2b2ae35);
+    h1 ^= h1 >>> 16;
+    return h1 | 0;
+  }
+  /* Spark's Murmur3_x86_32.hashUnsafeBytes: 4-byte blocks, then each tail byte through a full mix */
+  function sparkHash(str) {
+    var b = enc.encode(str), len = b.length, h1 = 42, i = 0, aligned = len - (len % 4);
+    for (; i < aligned; i += 4) {
+      h1 = mixH1(h1, mixK1(b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)));
+    }
+    for (; i < len; i++) { h1 = mixH1(h1, mixK1((b[i] << 24) >> 24)); }
+    return fmix(h1, len);
+  }
+  function pmod(x, p) { var r = x % p; return r < 0 ? r + p : r; }
+
+  /* ---------- model ---------- */
+  var SIZES = [1000, 5000, 25000, 100000, 500000, 1000000, 5000000, 10000000];
+
+  /* Zipf profile: share(i) proportional to i^-alpha. alpha 0 is uniform, and it
+     climbs with the slider, so value 1 is always the hottest key. */
+  function keyCounts(V, N, skewPct) {
+    var s = skewPct / 100, alpha = 6.5 * s * s;
+    var w = new Array(V), sum = 0, i;
+    for (i = 0; i < V; i++) { w[i] = Math.pow(i + 1, -alpha); sum += w[i]; }
+    var counts = new Array(V), used = 0;
+    for (i = 1; i < V; i++) { counts[i] = Math.round(N * w[i] / sum); used += counts[i]; }
+    counts[0] = Math.max(0, N - used);
+    return counts;
+  }
+
+  /* Every (value, salt) bucket knows where it sat before the salt and where it
+     lands after, so the same walk builds both partition loads and the flows
+     between them. */
+  function simulate(cfg) {
+    var counts = keyCounts(cfg.V, cfg.N, cfg.skew);
+    var noSalt = new Array(cfg.PB).fill(0), salted = new Array(cfg.P).fill(0);
+    var flows = {}, valuesAt = {};
+    for (var v = 0; v < cfg.V; v++) {
+      var c = counts[v];
+      if (!c) { continue; }
+      var key = String(v + 1);
+      var bp = pmod(sparkHash(key), cfg.PB);
+      noSalt[bp] += c;
+      /* several distinct values can hash to the same pre-salt partition, and
+         must once there are more values than partitions */
+      (valuesAt[bp] = valuesAt[bp] || []).push(v + 1);
+      var base = Math.floor(c / cfg.S), rem = c % cfg.S;
+      for (var s = 0; s < cfg.S; s++) {
+        var rows = base + (s < rem ? 1 : 0);
+        if (!rows) { continue; }
+        var ap = pmod(sparkHash(key + "_" + s), cfg.P);
+        salted[ap] += rows;
+        var k = bp + ":" + ap;
+        flows[k] = (flows[k] || 0) + rows;
+      }
+    }
+    return { counts: counts, noSalt: noSalt, salted: salted, flows: flows, valuesAt: valuesAt };
+  }
+
+  function fmt(n) { return n.toLocaleString("en-US"); }
+  function compact(n) {
+    if (n >= 1e6) { return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + "M"; }
+    if (n >= 1e3) { return (n / 1e3).toFixed(n % 1e3 === 0 ? 0 : 1) + "k"; }
+    return String(Math.round(n));
+  }
+  function tokens() {
+    var cs = getComputedStyle(document.documentElement);
+    function g(n) { return cs.getPropertyValue(n).trim(); }
+    return { hot: g("--hot"), cool: g("--cool"), good: g("--good"), fg: g("--fg"),
+             fg2: g("--fg-2"), fg3: g("--fg-3"), line: g("--line"), surface: g("--surface") };
+  }
+  /* One cool family rather than a rainbow: hue walks a narrow blue-to-violet
+     band while lightness steps down with it, so neighbouring partitions stay
+     distinguishable and the chart still reads as a single palette. */
+  function ramp(i, n, a) {
+    var t = n <= 1 ? 0.5 : i / (n - 1);
+    var hh = Math.round(198 + 92 * t), l = Math.round(62 - 16 * t);
+    return a == null ? "hsl(" + hh + ", 74%, " + l + "%)"
+                     : "hsla(" + hh + ", 74%, " + l + "%, " + a + ")";
+  }
+  var SINK_COLOR = "hsl(224, 11%, 56%)";
+
+  /* ---------- theme ---------- */
+  function useTheme() {
+    var t = useState(tokens()), tok = t[0], setTok = t[1];
+    useEffect(function () {
+      function sync() { setTok(tokens()); }
+      var mq = matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", sync);
+      var mo = new MutationObserver(sync);
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+      return function () { mq.removeEventListener("change", sync); mo.disconnect(); };
+    }, []);
+    return tok;
+  }
+
+  /* ---------- plotly wrapper ---------- */
+  function Plot(props) {
+    var ref = useRef(null);
+    useEffect(function () {
+      if (!ref.current || typeof Plotly === "undefined") { return; }
+      Plotly.react(ref.current, props.data, props.layout,
+                   props.config || { responsive: true, displayModeBar: false });
+    });
+    useEffect(function () {
+      return function () { if (ref.current && typeof Plotly !== "undefined") { Plotly.purge(ref.current); } };
+    }, []);
+    return h("div", { className: props.className, style: props.style, ref: ref });
+  }
+
+  /* ---------- config ---------- */
+  var PRESETS = {
+    celebrity: { rows: 7, keys: 50, skew: 97, partsBefore: 16, parts: 16, salts: 32 },
+    extreme:   { rows: 5, keys: 5,  skew: 92, partsBefore: 8,  parts: 8,  salts: 16 },
+    moderate:  { rows: 4, keys: 8,  skew: 55, partsBefore: 8,  parts: 8,  salts: 12 },
+    balanced:  { rows: 4, keys: 12, skew: 8,  partsBefore: 8,  parts: 8,  salts: 8  },
+    longtail:  { rows: 6, keys: 60, skew: 70, partsBefore: 12, parts: 24, salts: 24 }
+  };
+  var PRESET_LABELS = [
+    ["celebrity", "Celebrity key"], ["extreme", "Extreme skew"], ["moderate", "Moderate skew"],
+    ["balanced", "Balanced"], ["longtail", "Long tail, 60 keys"]
+  ];
+
+  function Slider(props) {
+    return h("div", { className: "ctrl" },
+      h("div", { className: "row" },
+        h("label", { htmlFor: props.id }, props.label),
+        h("span", { className: "val" }, props.display)),
+      h("input", { type: "range", id: props.id, min: props.min, max: props.max, step: 1,
+                   value: props.value,
+                   onChange: function (e) { props.onChange(+e.target.value); } }),
+      h("span", { className: "hint" }, props.hint));
+  }
+
+  function ConfigPanel(props) {
+    var o = useState(true), open = o[0], setOpen = o[1];
+    var raw = props.raw, cfg = props.cfg, set = props.set;
+    return h("section", { className: "card" },
+      h("button", { className: "panel-head", "aria-expanded": open ? "true" : "false",
+                    "aria-controls": "cfgBody", onClick: function () { setOpen(!open); } },
+        h("span", { className: "chev" + (open ? "" : " closed"), "aria-hidden": "true" }, "▼"),
+        "Configuration",
+        h("span", { className: "tally" },
+          compact(cfg.N) + " · " + cfg.V + " values · " + cfg.PB + " → " + cfg.P +
+          " partitions · " + cfg.S + " salts")),
+      h("div", { className: "panel-body", id: "cfgBody", hidden: !open },
+        h("div", { className: "presets", role: "group", "aria-label": "Presets" },
+          PRESET_LABELS.map(function (p) {
+            var def = PRESETS[p[0]];
+            var on = def.rows === raw.rows && def.keys === raw.keys && def.skew === raw.skew &&
+                     def.partsBefore === raw.partsBefore && def.parts === raw.parts && def.salts === raw.salts;
+            return h("button", { key: p[0], className: "preset", "aria-pressed": on ? "true" : "false",
+                                 onClick: function () { props.setRaw(Object.assign({}, def)); } }, p[1]);
+          })),
+        h("div", { className: "grid" },
+          h(Slider, { id: "rows", label: "Dataset size", min: 0, max: 7, value: raw.rows,
+                      display: compact(cfg.N) + " rows", hint: "Total rows on the skewed side",
+                      onChange: function (v) { set("rows", v); } }),
+          h(Slider, { id: "keys", label: "Distinct values", min: 2, max: 200, value: raw.keys,
+                      display: String(cfg.V), hint: "Join key cardinality",
+                      onChange: function (v) { set("keys", v); } }),
+          h(Slider, { id: "skew", label: "Skew", min: 0, max: 100, value: raw.skew,
+                      display: raw.skew + "% · top value " + props.topShare + "%",
+                      hint: "0% spreads rows evenly, 100% puts nearly all of them on one value",
+                      onChange: function (v) { set("skew", v); } }),
+          h(Slider, { id: "partsBefore", label: "Partitions before salting", min: 2, max: 200,
+                      value: raw.partsBefore, display: String(cfg.PB),
+                      hint: "how the data is laid out on the way in",
+                      onChange: function (v) { set("partsBefore", v); } }),
+          h(Slider, { id: "parts", label: "Shuffle partitions after", min: 2, max: 200, value: raw.parts,
+                      display: String(cfg.P), hint: "spark.sql.shuffle.partitions — Spark's default is 200",
+                      onChange: function (v) { set("parts", v); } }),
+          h(Slider, { id: "salts", label: "Salt range", min: 1, max: 100, value: raw.salts,
+                      display: cfg.S === 1 ? "none" : "0–" + (cfg.S - 1),
+                      hint: "Salts are round-robined across each value's rows",
+                      onChange: function (v) { set("salts", v); } }))));
+  }
+
+  /* ---------- metrics ---------- */
+  function Metrics(props) {
+    var cfg = props.cfg, sim = props.sim;
+    var before = Math.max.apply(null, sim.noSalt), after = Math.max.apply(null, sim.salted);
+    /* each side is measured against its own even split, since the two sides
+       can now have different partition counts */
+    var idealB = cfg.N / cfg.PB, idealA = cfg.N / cfg.P;
+    var idle = sim.noSalt.filter(function (v) { return v === 0; }).length;
+    var cut = before ? Math.round(100 * (before - after) / before) : 0;
+    /* how the distinct values actually spread over the pre-salt partitions:
+       equal counts do not give one value per partition */
+    var parts = Object.keys(sim.valuesAt), reached = parts.length, biggest = 0;
+    parts.forEach(function (p) { biggest = Math.max(biggest, sim.valuesAt[p].length); });
+    var tiles = [
+      { k: "Heaviest task, no salt", v: fmt(before), c: "hot",
+        n: (before / idealB).toFixed(1) + "× its even split over " + cfg.PB },
+      { k: "Heaviest task, salted", v: fmt(after), c: "cool",
+        n: (after / idealA).toFixed(1) + "× its even split over " + cfg.P },
+      { k: "Ideal even split", v: fmt(Math.round(idealA)), c: "",
+        n: fmt(cfg.N) + " rows over " + cfg.P + " shuffle partitions" },
+      { k: "Straggler cut", v: cut + "%", c: cut > 0 ? "good" : "", n: "the stage is gated by its slowest task" },
+      { k: "Idle partitions", v: idle + " of " + cfg.PB, c: idle ? "hot" : "",
+        n: "before salting — cores with nothing to do" },
+      { k: "Values sharing one partition", v: String(biggest), c: biggest > 1 ? "hot" : "good",
+        n: cfg.V + " value" + (cfg.V === 1 ? "" : "s") + " reached " + reached + " of " + cfg.PB +
+           " partitions before salting" }
+    ];
+    return h("section", { className: "metrics" }, tiles.map(function (t, i) {
+      return h("div", { className: "tile", key: i },
+        h("span", { className: "k" }, t.k),
+        h("span", { className: "v " + t.c }, t.v),
+        h("span", { className: "n" }, t.n));
+    }));
+  }
+
+  /* ---------- before / after flow ---------- */
+  function FlowSankey(props) {
+    var cfg = props.cfg, sim = props.sim, tok = props.tok;
+
+    var model = useMemo(function () {
+      var beforeUsed = [], afterUsed = [], bIdx = {}, aIdx = {}, i;
+      for (i = 0; i < cfg.PB; i++) { if (sim.noSalt[i] > 0) { bIdx[i] = beforeUsed.length; beforeUsed.push(i); } }
+      for (i = 0; i < cfg.P; i++) { if (sim.salted[i] > 0) { aIdx[i] = afterUsed.length; afterUsed.push(i); } }
+      var off = beforeUsed.length, nb = beforeUsed.length, na = afterUsed.length;
+      var src = [], tgt = [], val = [], lcol = [], lcd = [];
+      Object.keys(sim.flows).forEach(function (k) {
+        var pair = k.split(":"), b = +pair[0], a = +pair[1];
+        if (!(b in bIdx) || !(a in aIdx)) { return; }
+        src.push(bIdx[b]); tgt.push(off + aIdx[a]); val.push(sim.flows[k]);
+        lcol.push(ramp(bIdx[b], nb, 0.62));
+        lcd.push("p" + b + " → p" + a);
+      });
+
+      /* tall enough that every node has room, capped so the card stays sane;
+         the gap between nodes tightens as the partition count climbs */
+      var rows = Math.max(nb, na);
+      var pad = rows > 40 ? 2 : rows > 24 ? 5 : rows > 14 ? 8 : 11;
+      var height = Math.max(420, Math.min(900, rows * 28 + 110));
+
+      /* A node only keeps its label if its band is tall enough to hold one.
+         The rest drop the label and carry the name on hover instead. */
+      var usable = Math.max(height - 28 - pad * (rows - 1), 40);
+      var minRows = 15 / usable;
+      var full = beforeUsed.map(function (p) { return "p" + p; })
+                 .concat(afterUsed.map(function (p) { return "p" + p; }));
+      var loads = beforeUsed.map(function (p) { return sim.noSalt[p]; })
+                  .concat(afterUsed.map(function (p) { return sim.salted[p]; }));
+      var total = cfg.N || 1;
+      var shown = full.map(function (lab, j) { return loads[j] / total >= minRows ? lab : ""; });
+      var hiddenCount = shown.filter(function (s) { return s === ""; }).length;
+
+      /* a pre-salt node names the distinct values that hashed onto it */
+      var biggest = 0;
+      var custom = beforeUsed.map(function (p) {
+        var vs = sim.valuesAt[p] || [];
+        biggest = Math.max(biggest, vs.length);
+        var head = vs.slice(0, 6).join(", ") + (vs.length > 6 ? " +" + (vs.length - 6) + " more" : "");
+        return "p" + p + " · " + vs.length + (vs.length === 1 ? " value: " : " values: ") + head;
+      }).concat(afterUsed.map(function (p) { return "p" + p; }));
+
+      var ncol = beforeUsed.map(function (_, j) { return ramp(j, nb); })
+                 .concat(afterUsed.map(function () { return SINK_COLOR; }));
+      return { shown: shown, full: full, custom: custom, ncol: ncol, src: src, tgt: tgt, val: val,
+               lcol: lcol, lcd: lcd, nb: nb, na: na, links: val.length, height: height, pad: pad,
+               hidden: hiddenCount, biggest: biggest };
+    }, [cfg.PB, cfg.P, cfg.N, sim]);
+
+    var height = model.height;
+
+    return h("section", { className: "card", style: { padding: "14px 14px 12px" } },
+      h("div", { className: "sec-head" },
+        h("h2", null, "Where the rows move"),
+        h("span", { className: "note" },
+          "every node is a partition · " + model.links + " flows · ribbon width is rows" +
+          (model.hidden ? " · " + model.hidden + " label" + (model.hidden === 1 ? "" : "s") + " on hover only" : ""))),
+      h("div", { className: "flowhead" },
+        h("span", { className: "b" }, "Before salting",
+          h("span", { className: "fsub" },
+            cfg.V + " value" + (cfg.V === 1 ? "" : "s") + " landed on " + model.nb + " of " + cfg.PB +
+            (model.biggest > 1 ? " · up to " + model.biggest + " sharing one partition" : ""))),
+        h("span", { className: "a" }, "After salting")),
+      h(Plot, {
+        className: "sankey",
+        style: { height: height + "px" },
+        data: [{
+          type: "sankey", orientation: "h", arrangement: "snap",
+          node: {
+            pad: model.pad, thickness: 13, line: { width: 0 },
+            label: model.shown, customdata: model.custom, color: model.ncol,
+            hovertemplate: "%{customdata} · <b>%{value:,} rows</b><extra></extra>"
+          },
+          link: {
+            source: model.src, target: model.tgt, value: model.val, color: model.lcol,
+            customdata: model.lcd,
+            hovertemplate: "%{customdata}<br><b>%{value:,} rows</b><extra></extra>"
+          }
+        }],
+        layout: {
+          margin: { l: 6, r: 6, t: 6, b: 6 },
+          paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+          font: { family: "IBM Plex Mono, monospace", size: 11, color: tok.fg2 }
+        }
+      }),
+      h("div", { className: "tstrip" },
+        h("div", { className: "tstep" },
+          h("div", { className: "t1" }, "1 · key"), h("div", { className: "t2" }, "value")),
+        h("span", { className: "arw" }, "→"),
+        h("div", { className: "tstep" },
+          h("div", { className: "t1" }, "2 · add salt"),
+          h("div", { className: "t2" }, "0–" + (cfg.S - 1) + " round-robin")),
+        h("span", { className: "arw" }, "→"),
+        h("div", { className: "tstep" },
+          h("div", { className: "t1" }, "3 · hash"),
+          h("div", { className: "t2" }, "murmur3(value_salt)")),
+        h("span", { className: "arw" }, "→"),
+        h("div", { className: "tstep" },
+          h("div", { className: "t1" }, "4 · route"),
+          h("div", { className: "t2" }, "pmod(h, " + cfg.P + ")"))));
+  }
+
+  /* ---------- rows per value ---------- */
+  function RowsPerValue(props) {
+    var cfg = props.cfg, sim = props.sim, tok = props.tok;
+    var labels = [];
+    for (var i = 0; i < cfg.V; i++) { labels.push(String(i + 1)); }
+    return h("section", { className: "card", style: { padding: "14px 14px 6px" } },
+      h("div", { className: "sec-head" },
+        h("h2", null, "Rows per value"),
+        h("span", { className: "note" }, "the skew you dialled in, before any partitioning")),
+      h(Plot, {
+        className: "plot",
+        data: [{ x: labels, y: sim.counts, type: "bar", marker: { color: tok.hot },
+                 hovertemplate: "value %{x} · <b>%{y:,} rows</b><extra></extra>" }],
+        layout: {
+          bargap: cfg.V > 60 ? 0.08 : 0.3,
+          margin: { l: 58, r: 14, t: 10, b: 42 },
+          paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+          font: { family: "IBM Plex Sans, sans-serif", size: 12, color: tok.fg2 },
+          xaxis: { type: "category", tickfont: { size: 11, color: tok.fg3 }, showgrid: false,
+                   linecolor: tok.line, automargin: true, nticks: 20,
+                   title: { text: "value", font: { size: 11, color: tok.fg3 } } },
+          yaxis: { tickfont: { size: 11, color: tok.fg3 }, gridcolor: tok.line, zerolinecolor: tok.line,
+                   tickformat: "~s", rangemode: "tozero", automargin: true }
+        }
+      }));
+  }
+
+  /* ---------- pan + zoom pipeline canvas ---------- */
+  var VB_W = 1280, VB_H = 620;
+
+  function Node(props) {
+    var w = props.w || 108, ht = props.h || 24;
+    return h("g", { className: "nd " + (props.tone || ""), transform: "translate(" + props.x + "," + props.y + ")" },
+      h("rect", { width: w, height: ht, rx: 4 }),
+      h("text", { x: w / 2, y: ht / 2 + 4, textAnchor: "middle" }, props.label));
+  }
+
+  function PipelineCanvas(props) {
+    var cfg = props.cfg;
+    var v = useState({ x: 0, y: 0, k: 1 }), view = v[0], setView = v[1];
+    var d = useState(false), dragging = d[0], setDragging = d[1];
+    var holdRef = useRef(null), drag = useRef(null);
+
+    useEffect(function () {
+      var node = holdRef.current;
+      if (!node) { return; }
+      function onWheel(e) {
+        /* plain wheel keeps scrolling the page; zoom is deliberate */
+        if (!e.ctrlKey && !e.metaKey) { return; }
+        e.preventDefault();
+        var r = node.getBoundingClientRect();
+        var f = VB_W / r.width;
+        var mx = (e.clientX - r.left) * f, my = (e.clientY - r.top) * f;
+        setView(function (vw) {
+          var k = Math.min(4, Math.max(0.4, vw.k * Math.exp(-e.deltaY * 0.0015)));
+          var ratio = k / vw.k;
+          return { k: k, x: mx - ratio * (mx - vw.x), y: my - ratio * (my - vw.y) };
+        });
+      }
+      node.addEventListener("wheel", onWheel, { passive: false });
+      return function () { node.removeEventListener("wheel", onWheel); };
+    }, []);
+
+    function down(e) {
+      var r = holdRef.current.getBoundingClientRect();
+      drag.current = { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, f: VB_W / r.width };
+      setDragging(true);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    function move(e) {
+      if (!drag.current) { return; }
+      var g = drag.current;
+      setView(function (vw) {
+        return { k: vw.k, x: g.vx + (e.clientX - g.sx) * g.f, y: g.vy + (e.clientY - g.sy) * g.f };
+      });
+    }
+    function up(e) {
+      drag.current = null; setDragging(false);
+      if (e.currentTarget.hasPointerCapture && e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    }
+    function zoomBy(mult) {
+      setView(function (vw) {
+        var k = Math.min(4, Math.max(0.4, vw.k * mult));
+        var ratio = k / vw.k, cx = VB_W / 2, cy = VB_H / 2;
+        return { k: k, x: cx - ratio * (cx - vw.x), y: cy - ratio * (cy - vw.y) };
+      });
+    }
+
+    var S = cfg.S, P = cfg.P;
+    var saltsShown = Math.min(S, 4);
+    var bigRows = [], i;
+    for (i = 0; i < saltsShown; i++) {
+      var sk = "1_" + i, hh = sparkHash(sk);
+      bigRows.push({ salt: i, key: sk, hash: hh, part: pmod(hh, P) });
+    }
+    var listTxt = "[" + Array.from({ length: Math.min(S, 3) }, function (_, j) { return j; }).join(", ") +
+                  (S > 3 ? ", …" : "") + "]";
+
+    var rowY = function (n) { return 108 + n * 44; };
+    var lines = [];
+    function flow(x1, y1, x2, y2, key) {
+      var mid = (x1 + x2) / 2;
+      lines.push(h("path", { key: key, className: "flow",
+        d: "M" + x1 + "," + y1 + " C" + mid + "," + y1 + " " + mid + "," + y2 + " " + x2 + "," + y2 }));
+    }
+
+    var left = [], right = [];
+    bigRows.forEach(function (r, n) {
+      var y = rowY(n);
+      left.push(h(Node, { key: "v" + n, x: 40, y: y, w: 64, label: "1", tone: "hot" }));
+      left.push(h(Node, { key: "s" + n, x: 166, y: y, w: 92, label: "salt " + r.salt }));
+      left.push(h(Node, { key: "k" + n, x: 320, y: y, w: 104, label: r.key, tone: "hot" }));
+      left.push(h(Node, { key: "hsh" + n, x: 452, y: y, w: 126, label: String(r.hash) }));
+      left.push(h(Node, { key: "p" + n, x: 606, y: y, w: 58, label: "p" + r.part, tone: "cool" }));
+      flow(104, y + 12, 166, y + 12, "fa" + n);
+      flow(258, y + 12, 320, y + 12, "fb" + n);
+      flow(424, y + 12, 452, y + 12, "fc" + n);
+      flow(578, y + 12, 606, y + 12, "fd" + n);
+    });
+    if (S > saltsShown) {
+      left.push(h("text", { key: "more", className: "cap", x: 40, y: rowY(saltsShown) + 14 },
+        "… " + (S - saltsShown) + " more salts for value 1"));
+    }
+
+    for (i = 0; i < 3 && i < cfg.V; i++) {
+      var y2 = rowY(i);
+      right.push(h(Node, { key: "dv" + i, x: 740, y: y2, w: 64, label: String(i + 1), tone: "hot" }));
+      right.push(h(Node, { key: "dl" + i, x: 866, y: y2, w: 118, label: listTxt }));
+      right.push(h(Node, { key: "de" + i, x: 1046, y: y2, w: 118, label: (i + 1) + "_0 … " + (i + 1) + "_" + (S - 1) }));
+      flow(804, y2 + 12, 866, y2 + 12, "ra" + i);
+      flow(984, y2 + 12, 1046, y2 + 12, "rb" + i);
+    }
+
+    var joinY = 452;
+    flow(352, rowY(saltsShown - 1) + 24, 580, joinY + 4, "jl");
+    flow(1105, rowY(Math.min(3, cfg.V) - 1) + 24, 700, joinY + 4, "jr");
+
+    return h("section", { className: "card", style: { padding: "16px" } },
+      h("div", { className: "sec-head" },
+        h("h2", null, "The pipeline"),
+        h("span", { className: "note" }, "drag to pan · ctrl + scroll, or the buttons, to zoom")),
+      h("div", { className: "canvas-bar" },
+        h("button", { className: "zbtn", onClick: function () { zoomBy(1.25); }, "aria-label": "Zoom in" }, "+"),
+        h("button", { className: "zbtn", onClick: function () { zoomBy(0.8); }, "aria-label": "Zoom out" }, "−"),
+        h("button", { className: "zbtn wide", onClick: function () { setView({ x: 0, y: 0, k: 1 }); } }, "Reset"),
+        h("span", { className: "spacer" }, Math.round(view.k * 100) + "%")),
+      h("div", { className: "canvas-hold", ref: holdRef },
+        h("svg", { viewBox: "0 0 " + VB_W + " " + VB_H, className: dragging ? "dragging" : "",
+                   onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up,
+                   role: "img",
+                   "aria-label": "Pipeline diagram: the skewed side gains a salt and is hashed to a partition, while the small side is exploded once per salt, then both meet in the join." },
+          h("g", { transform: "translate(" + view.x + "," + view.y + ") scale(" + view.k + ")" },
+            h("g", { className: "lane" },
+              h("rect", { x: 20, y: 56, width: 664, height: 330, rx: 10 }),
+              h("text", { x: 36, y: 80 }, "Skewed side gets salted"),
+              h("rect", { x: 712, y: 56, width: 548, height: 330, rx: 10 }),
+              h("text", { x: 728, y: 80 }, "Small side is exploded")),
+            h("text", { className: "cap", x: 40, y: 100 }, "value"),
+            h("text", { className: "cap", x: 166, y: 100 }, "+ salt"),
+            h("text", { className: "cap", x: 320, y: 100 }, "salted key"),
+            h("text", { className: "cap", x: 452, y: 100 }, "murmur3, seed 42"),
+            h("text", { className: "cap", x: 606, y: 100 }, "partition"),
+            h("text", { className: "cap", x: 740, y: 100 }, "value"),
+            h("text", { className: "cap", x: 866, y: 100 }, "salt_values"),
+            h("text", { className: "cap", x: 1046, y: 100 }, "after explode"),
+            lines, left, right,
+            h("g", { className: "join", transform: "translate(560,440)" },
+              h("rect", { width: 160, height: 46, rx: 8 }),
+              h("text", { x: 80, y: 28, textAnchor: "middle" }, "JOIN")),
+            h("text", { className: "cap", x: 640, y: 508, textAnchor: "middle" },
+              "on value AND salt — " + cfg.V + " values × " + S + " salts = " + (cfg.V * S) + " keys over " + P + " partitions")))));
+  }
+
+  /* ---------- app ---------- */
+  function App(props) {
+    var r = useState(function () {
+      var base = { rows: 5, keys: 5, skew: 92, partsBefore: 24, parts: 24, salts: 16 };
+      var saved = props && props.initial && props.initial.raw;
+      return saved ? Object.assign(base, saved) : base;
+    });
+    var raw = r[0], setRaw = r[1];
+    function set(k, v) { setRaw(function (p) { var n = Object.assign({}, p); n[k] = v; return n; }); }
+
+    /* The host restores form values by writing straight to the DOM: no event
+       fires, nothing mutates an attribute, and it can land long after the first
+       paint, so there is nothing to subscribe to. Watch the inputs instead and
+       adopt anything that drifts from our state, which keeps the thumb, the
+       readout and the charts agreeing and keeps the viewer's restored setting.
+       Returning the same object when nothing moved costs no re-render. */
+    useEffect(function () {
+      var FIELDS = ["rows", "keys", "skew", "partsBefore", "parts", "salts"];
+      var id = setInterval(function () {
+        setRaw(function (p) {
+          var next = null;
+          FIELDS.forEach(function (k) {
+            var el = document.getElementById(k);
+            if (!el || el.value === "") { return; }
+            var v = Number(el.value);
+            if (!isNaN(v) && v !== p[k]) { next = next || Object.assign({}, p); next[k] = v; }
+          });
+          return next || p;
+        });
+      }, 400);
+      return function () { clearInterval(id); };
+    }, []);
+
+    /* Hand the host our state so a republish restores the viewer's settings
+       through React instead of behind its back. */
+    useEffect(function () {
+      try {
+        var hot = window.claude && window.claude.hot;
+        if (hot && typeof hot.snapshot === "function") { hot.snapshot(function () { return { raw: raw }; }); }
+      } catch (e) { /* no hot hook outside a viewer */ }
+    }, [raw]);
+    var cfg = useMemo(function () {
+      return { N: SIZES[raw.rows], V: raw.keys, skew: raw.skew,
+               PB: raw.partsBefore, P: raw.parts, S: raw.salts };
+    }, [raw]);
+    var sim = useMemo(function () { return simulate(cfg); }, [cfg]);
+    var tok = useTheme();
+    var topShare = Math.round(100 * sim.counts[0] / cfg.N);
+    var distinct = cfg.V * cfg.S;
+
+    return h("div", { className: "wrap" },
+      h("header", null,
+        h("p", { className: "eyebrow" }, "Spark shuffle partitioning"),
+        h("h1", null, "Salt Lab"),
+        h("p", { className: "sub" },
+          "Build a skewed dataset, watch it collapse onto a few partitions, then add a salt and watch the load spread. Every partition here is computed with Spark's own hash: MurmurHash3 x86-32, seed 42.")),
+      h(ConfigPanel, { raw: raw, cfg: cfg, set: set, setRaw: setRaw, topShare: topShare }),
+      h(Metrics, { cfg: cfg, sim: sim }),
+      distinct < cfg.P * 2
+        ? h("div", { className: "flag" },
+            h("b", null, "Too few salted keys."),
+            h("span", null, cfg.V + " values × " + cfg.S + " salts gives " + distinct +
+              " distinct keys for " + cfg.P + " partitions. Raise the salt range until there are at least a few keys per partition."))
+        : null,
+      h(FlowSankey, { cfg: cfg, sim: sim, tok: tok }),
+      h(RowsPerValue, { cfg: cfg, sim: sim, tok: tok }),
+      h(PipelineCanvas, { cfg: cfg }),
+      h("section", { className: "foot" },
+        h("p", null, h("b", null, "Join on the salted key."), " Big side: ",
+          h("code", null, "withColumn(\"salt\", pmod(monotonically_increasing_id(), lit(S)))"),
+          ". Small side: ", h("code", null, "withColumn(\"salt\", explode(sequence(lit(0), lit(S - 1))))"),
+          ". Then join on ", h("code", null, "value"), " and ", h("code", null, "salt"),
+          " together. Skip the explode and the salted rows match nothing."),
+        h("p", null, h("b", null, "The salt range is a trade."),
+          " It multiplies the small side by S, so a wide salt range buys even partitions at the cost of a bigger broadcast or shuffle on the other side."),
+        h("p", null, h("b", null, "Before reaching for salt,"), " try AQE — ",
+          h("code", null, "spark.sql.adaptive.skewJoin.enabled"),
+          " splits skewed partitions on its own, and a broadcast join avoids the shuffle entirely when one side fits in memory.")));
+  }
+
+  function mount(initial) {
+    ReactDOM.createRoot(document.getElementById("root")).render(h(App, { initial: initial || {} }));
+  }
+  try {
+    var hot = window.claude && window.claude.hot;
+    if (hot && typeof hot.ready === "function") { hot.ready(mount); }
+    else { mount((hot && hot.data) || {}); }
+  } catch (e) { mount({}); }
+})();
+</script>
