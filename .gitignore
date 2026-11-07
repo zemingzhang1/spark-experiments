@@ -31,3 +31,7 @@ spark/derby.log
 spark/test
 # Python virtualenv
 .venv/
+
+scripts/pylibs/
+scripts/study_notes_caching/work/
+salt-lab-site/
