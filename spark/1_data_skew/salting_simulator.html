@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: config panel, metric strip, the before/after Sankey, rows per value, then a pannable pipeline canvas */
+/* Layout: config panel, metric strip, partition map with load charts, the before/after Sankey, then a collapsible pipeline panel */
 :root {
   --bg: #f6f6f3;
   --surface: #ffffff;
@@ -65,7 +65,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); f
 h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
 .sub { color: var(--fg-2); margin: 4px 0 0; font-size: 14px; max-width: 68ch; }
 .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--fg-3); margin: 0 0 8px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+/* a chart mid-resize must never paint over the rest of the page */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .panel-head {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 12px 16px; background: none; border: 0; cursor: pointer;
@@ -107,25 +108,32 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
 .flowhead .b { color: var(--hot); }
 .flowhead .a { color: var(--cool); }
 .sankey { width: 100%; }
-.tstrip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin-top: 4px; }
+/* fade between focus states instead of snapping, so crossing a gap between
+   ribbons does not flash the whole chart */
+.sankey .sankey-link, .sankey .sankey-node rect { transition: fill 240ms ease, stroke 240ms ease; }
+/* the drift back to rest is slower than a switch between ribbons */
+.sankey.calm .sankey-link, .sankey.calm .sankey-node rect { transition: fill 700ms ease, stroke 700ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .sankey .sankey-link, .sankey .sankey-node rect,
+  .sankey.calm .sankey-link, .sankey.calm .sankey-node rect { transition: none; }
+}
+.tstrip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 16px; }
+/* the four steps ride beside the intro text, dropping below only when too narrow */
+.titlerow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 6px; }
+.titlerow .sub { flex: 1 1 32ch; margin: 0; }
+.titlerow .tstrip { margin-top: 0; margin-left: auto; }
 .tstep { background: var(--surface-2); border-radius: 6px; padding: 5px 10px; }
 .tstep .t1 { font-size: 10.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.05em; }
 .tstep .t2 { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg); }
 .tstrip .arw { color: var(--fg-3); font-size: 13px; }
-.pmap { display: flex; flex-direction: column; gap: 16px; }
+/* the two load charts: thin, side by side, deliberately secondary to the map */
+.loadpair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-bottom: 20px; }
+@media (max-width: 620px) { .loadpair { grid-template-columns: 1fr; } }
+.loadbar { width: 100%; height: 132px; }
 .prow .plab { font-size: 12.5px; font-weight: 600; margin-bottom: 7px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .prow .plab .psub { font-weight: 400; font-size: 11.5px; color: var(--fg-3); }
 .prow.before .plab { color: var(--hot); }
 .prow.after .plab { color: var(--cool); }
-.pcells { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
-.pcell {
-  font-family: var(--font-mono); font-size: 10.5px; text-align: center;
-  padding: 7px 2px; border-radius: 4px; border: 1px solid transparent;
-  color: var(--fg); overflow: hidden; white-space: nowrap; cursor: default;
-}
-.pcell.empty { border: 1px dashed var(--line-strong); color: var(--fg-3); background: none; }
-.pcell.hot { color: #fff; }
-.plot { width: 100%; height: 240px; }
 .flag { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; background: var(--hot-soft); border: 1px solid var(--hot); color: var(--fg); border-radius: 8px; padding: 9px 12px; }
 .flag b { color: var(--hot); font-weight: 600; }
 .canvas-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
@@ -156,7 +164,7 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
 .flow { stroke: var(--line-strong); stroke-width: 1.4; fill: none; }
 .join rect { fill: var(--surface); stroke: var(--good); stroke-width: 1.5; }
 .join text { fill: var(--good); font-family: var(--font-sans); font-size: 13px; font-weight: 600; }
-.foot { font-size: 12.5px; color: var(--fg-3); max-width: 78ch; }
+.foot { font-size: 12.5px; color: var(--fg-3); max-width: 78ch; margin-top: 18px; }
 .foot code { font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--fg-2); }
 .foot p { margin: 0 0 7px; }
 @media (max-width: 520px) { h1 { font-size: 22px; } }
@@ -197,7 +205,10 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
   function pmod(x, p) { var r = x % p; return r < 0 ? r + p : r; }
 
   /* ---------- model ---------- */
-  var SIZES = [1000, 5000, 25000, 100000, 500000, 1000000, 5000000, 10000000];
+  /* row counts are never materialised — every partition total is computed from
+     the key distribution — so the top of this range costs the same as the bottom */
+  var SIZES = [1000, 5000, 25000, 100000, 500000, 1000000, 5000000, 10000000,
+               50000000, 100000000, 500000000, 1000000000, 5000000000];
 
   /* Zipf profile: share(i) proportional to i^-alpha. alpha 0 is uniform, and it
      climbs with the slider, so value 1 is always the hottest key. */
@@ -242,6 +253,7 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
 
   function fmt(n) { return n.toLocaleString("en-US"); }
   function compact(n) {
+    if (n >= 1e9) { return (n / 1e9).toFixed(n % 1e9 === 0 ? 0 : 1) + "B"; }
     if (n >= 1e6) { return (n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 1) + "M"; }
     if (n >= 1e3) { return (n / 1e3).toFixed(n % 1e3 === 0 ? 0 : 1) + "k"; }
     return String(Math.round(n));
@@ -255,13 +267,18 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
   /* One cool family rather than a rainbow: hue walks a narrow blue-to-violet
      band while lightness steps down with it, so neighbouring partitions stay
      distinguishable and the chart still reads as a single palette. */
-  function ramp(i, n, a) {
-    var t = n <= 1 ? 0.5 : i / (n - 1);
+  function rampT(t, a) {
     var hh = Math.round(198 + 92 * t), l = Math.round(62 - 16 * t);
     return a == null ? "hsl(" + hh + ", 74%, " + l + "%)"
                      : "hsla(" + hh + ", 74%, " + l + "%, " + a + ")";
   }
+  function ramp(i, n, a) { return rampT(n <= 1 ? 0.5 : i / (n - 1), a); }
   var SINK_COLOR = "hsl(224, 11%, 56%)";
+  /* ribbon opacity at rest, when focused, and when pushed to the background */
+  var LINK_BASE = 0.62, LINK_FOCUS = 0.95;
+  var MUTED_SELECT = 0.04, MUTED_HOVER = 0.07;
+  /* how long the faded state survives the cursor leaving a ribbon */
+  var HOLD_MS = 2000;
 
   /* ---------- theme ---------- */
   function useTheme() {
@@ -278,12 +295,43 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
   }
 
   /* ---------- plotly wrapper ---------- */
+  /* Plotly measures its container when it draws, and this build only re-measures
+     on a window resize. These containers also change size on their own — the
+     Sankey's height follows the partition count, and every chart's width follows
+     a reflow — so watch the element itself and resize on any change. Without
+     this the SVG keeps its old size and paints outside the card. */
+  function useFitPlot(ref) {
+    useEffect(function () {
+      var gd = ref.current;
+      if (!gd || typeof ResizeObserver === "undefined" || typeof Plotly === "undefined") { return; }
+      /* a timer rather than requestAnimationFrame: rAF stalls while the page is
+         not painting, which would leave the chart at its stale size, and the
+         short delay also coalesces the storm of events from dragging a window */
+      var pending = 0;
+      var ro = new ResizeObserver(function () {
+        if (pending) { return; }
+        pending = setTimeout(function () {
+          pending = 0;
+          if (gd.data) { try { Plotly.Plots.resize(gd); } catch (e) { /* torn down */ } }
+        }, 60);
+      });
+      ro.observe(gd);
+      return function () {
+        if (pending) { clearTimeout(pending); }
+        ro.disconnect();
+      };
+    }, []);
+  }
+
   function Plot(props) {
     var ref = useRef(null);
+    useFitPlot(ref);
     useEffect(function () {
       if (!ref.current || typeof Plotly === "undefined") { return; }
-      Plotly.react(ref.current, props.data, props.layout,
-                   props.config || { responsive: true, displayModeBar: false });
+      var gd = ref.current;
+      Plotly.react(gd, props.data, props.layout,
+                   props.config || { responsive: true, displayModeBar: false })
+        .then(function () { try { Plotly.Plots.resize(gd); } catch (e) { /* torn down */ } });
     });
     useEffect(function () {
       return function () { if (ref.current && typeof Plotly !== "undefined") { Plotly.purge(ref.current); } };
@@ -336,7 +384,7 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
                                  onClick: function () { props.setRaw(Object.assign({}, def)); } }, p[1]);
           })),
         h("div", { className: "grid" },
-          h(Slider, { id: "rows", label: "Dataset size", min: 0, max: 7, value: raw.rows,
+          h(Slider, { id: "rows", label: "Dataset size", min: 0, max: SIZES.length - 1, value: raw.rows,
                       display: compact(cfg.N) + " rows", hint: "Total rows on the skewed side",
                       onChange: function (v) { set("rows", v); } }),
           h(Slider, { id: "keys", label: "Distinct values", min: 2, max: 200, value: raw.keys,
@@ -395,54 +443,228 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
     }));
   }
 
+  /* ---------- what the salt does, in four steps ----------
+     Sits under the title: it is the model the whole page runs on, so it reads
+     better as the opening statement than as a footnote to one chart. */
+  function TransformStrip(props) {
+    var cfg = props.cfg;
+    function step(n, label, body) {
+      return h("div", { className: "tstep", key: n },
+        h("div", { className: "t1" }, n + " · " + label),
+        h("div", { className: "t2" }, body));
+    }
+    return h("div", { className: "tstrip" },
+      step(1, "key", "value"),
+      h("span", { className: "arw", "aria-hidden": "true" }, "→"),
+      step(2, "add salt", "0–" + (cfg.S - 1) + " round-robin"),
+      h("span", { className: "arw", "aria-hidden": "true" }, "→"),
+      step(3, "hash", "murmur3(value_salt)"),
+      h("span", { className: "arw", "aria-hidden": "true" }, "→"),
+      step(4, "route", "pmod(h, " + cfg.P + ")"));
+  }
+
+  /* ---------- interactive sankey ----------
+     Click a partition to isolate what flows through it; click again to clear.
+     Hover a ribbon to follow one flow. Both work by repainting the colour
+     arrays: every colour is a ramp position plus an alpha, so focusing costs
+     one restyle instead of a re-render. */
+  function SankeyPlot(props) {
+    var holder = useRef(null);
+    var ui = useRef({ sel: null, hov: null });
+    var hold = useRef(null);
+    var model = props.model;
+    useFitPlot(holder);
+
+    function paint() {
+      var gd = holder.current;
+      if (!gd || !gd.data || typeof Plotly === "undefined") { return; }
+      var st = ui.current, m = model, i;
+      var lc = new Array(m.lt.length);
+      for (i = 0; i < m.lt.length; i++) {
+        var a;
+        if (st.sel !== null) {
+          a = (m.src[i] === st.sel || m.tgt[i] === st.sel) ? LINK_FOCUS : MUTED_SELECT;
+        } else if (st.hov !== null) {
+          a = (i === st.hov) ? LINK_FOCUS : MUTED_HOVER;
+        } else {
+          a = LINK_BASE;
+        }
+        lc[i] = rampT(m.lt[i], a);
+      }
+      var nc = new Array(m.nt.length);
+      for (i = 0; i < m.nt.length; i++) {
+        var na = 1;
+        if (st.sel !== null) {
+          na = (i === st.sel || m.nbrs[st.sel][i]) ? 1 : 0.13;
+        } else if (st.hov !== null) {
+          na = (m.src[st.hov] === i || m.tgt[st.hov] === i) ? 1 : 0.22;
+        }
+        nc[i] = rampT(m.nt[i], na);
+      }
+      Plotly.restyle(gd, { "link.color": [lc], "node.color": [nc] }).then(function () {
+        if (st.hov === null && st.sel === null) { return; }
+        /* lift the focused ribbons: in SVG the last drawn wins */
+        try {
+          var paths = gd.querySelectorAll(".sankey-link"), k;
+          if (st.hov !== null && paths[st.hov]) {
+            paths[st.hov].parentNode.appendChild(paths[st.hov]);
+          } else if (st.sel !== null) {
+            for (k = 0; k < m.src.length; k++) {
+              if ((m.src[k] === st.sel || m.tgt[k] === st.sel) && paths[k]) {
+                paths[k].parentNode.appendChild(paths[k]);
+              }
+            }
+          }
+        } catch (e) { /* ordering is a bonus, not a requirement */ }
+      });
+    }
+
+    useEffect(function () {
+      if (!holder.current || typeof Plotly === "undefined") { return; }
+      if (hold.current) { clearTimeout(hold.current); hold.current = null; }
+      ui.current = { sel: null, hov: null };
+      holder.current.classList.remove("calm");
+      var gd = holder.current;
+      /* resize after the redraw: the box may have changed size with this render
+         (the height follows the partition count), and Plotly would otherwise
+         keep the size it measured last time */
+      Plotly.react(gd, props.data, props.layout, { responsive: true, displayModeBar: false })
+        .then(function () { try { Plotly.Plots.resize(gd); } catch (e) { /* torn down */ } });
+      if (props.onSelect) { props.onSelect(null); }
+    }, [props.data, props.layout]);
+
+    useEffect(function () {
+      return function () { if (hold.current) { clearTimeout(hold.current); } };
+    }, []);
+
+    useEffect(function () {
+      var gd = holder.current;
+      if (!gd || !gd.on) { return; }
+      function isLink(pt) { return pt && pt.source !== undefined && pt.target !== undefined; }
+      function idxOf(pt) { return pt.index !== undefined ? pt.index : pt.pointNumber; }
+      function stopRestore() {
+        if (hold.current) { clearTimeout(hold.current); hold.current = null; }
+      }
+      function onClick(ev) {
+        var pt = ev && ev.points && ev.points[0];
+        if (!pt || isLink(pt)) { return; }
+        stopRestore();
+        gd.classList.remove("calm");
+        var i = idxOf(pt);
+        ui.current.sel = (ui.current.sel === i) ? null : i;
+        ui.current.hov = null;
+        paint();
+        if (props.onSelect) { props.onSelect(ui.current.sel); }
+      }
+      function onHover(ev) {
+        if (ui.current.sel !== null) { return; }
+        var pt = ev && ev.points && ev.points[0];
+        if (!isLink(pt)) { return; }
+        stopRestore();
+        var i = idxOf(pt);
+        /* Plotly re-fires hover for the ribbon already focused; repainting for
+           that is what made moving along a ribbon feel jumpy */
+        if (ui.current.hov === i) { return; }
+        gd.classList.remove("calm");
+        ui.current.hov = i;
+        paint();
+      }
+      /* Crossing the gap between two ribbons fires unhover then hover. Holding
+         the faded state through that gap keeps the chart from flashing back to
+         full brightness on every dark patch the cursor passes over. */
+      function onUnhover() {
+        if (ui.current.sel !== null || ui.current.hov === null) { return; }
+        stopRestore();
+        hold.current = setTimeout(function () {
+          hold.current = null;
+          if (ui.current.sel !== null || ui.current.hov === null) { return; }
+          ui.current.hov = null;
+          gd.classList.add("calm");
+          paint();
+        }, HOLD_MS);
+      }
+      gd.on("plotly_click", onClick);
+      gd.on("plotly_hover", onHover);
+      gd.on("plotly_unhover", onUnhover);
+      return function () {
+        if (gd.removeAllListeners) {
+          gd.removeAllListeners("plotly_click");
+          gd.removeAllListeners("plotly_hover");
+          gd.removeAllListeners("plotly_unhover");
+        }
+      };
+    });
+
+    return h("div", { className: props.className, style: props.style, ref: holder });
+  }
+
   /* ---------- partition map ----------
      The Sankey can only draw partitions that carry rows. This shows every
      partition you configured, so an empty one is visible as an empty one. */
-  function PartitionRow(props) {
-    var loads = props.loads, count = props.count, valuesAt = props.valuesAt;
-    var max = 1, p;
-    for (p = 0; p < count; p++) { if (loads[p] > max) { max = loads[p]; } }
-    var live = 0;
-    for (p = 0; p < count; p++) { if (loads[p] > 0) { live++; } }
-    var cells = [];
-    for (p = 0; p < count; p++) {
-      var rows = loads[p] || 0;
-      var t = rows / max;
-      var vs = valuesAt ? (valuesAt[p] || []) : null;
-      var tip = "p" + p + (rows
-        ? " · " + fmt(rows) + " rows" +
-          (vs && vs.length ? " · value" + (vs.length === 1 ? " " : "s ") + vs.join(", ") : "")
-        : " · empty");
-      cells.push(h("div", {
-        key: p,
-        className: "pcell" + (rows ? (t > 0.55 ? " hot" : "") : " empty"),
-        style: rows ? { background: "hsla(214, 74%, 52%, " + (0.16 + 0.84 * t).toFixed(3) + ")" } : null,
-        title: tip
-      }, "p" + p));
+  /* Load per partition as a thin bar chart. Both sides share one y range, so
+     the drop in the tallest bar is the whole story; the axes stay unlabelled
+     because the shape is the point, not the individual partition numbers. */
+  function LoadBars(props) {
+    var tok = props.tok, x = [], fill = [], i;
+    for (i = 0; i < props.loads.length; i++) {
+      x.push(i);
+      /* one blue, light where a partition is quiet and deep where it is loaded,
+         scaled against the shared peak so equal bars match across both charts */
+      var t = Math.min(1, props.loads[i] / props.max);
+      fill.push("hsl(212, " + Math.round(58 + 26 * t) + "%, " + Math.round(74 - 34 * t) + "%)");
     }
-    return h("div", { className: "prow " + props.tone },
-      h("div", { className: "plab" }, props.label,
-        h("span", { className: "psub" },
-          (props.extra ? props.extra + " · " : "") +
-          live + " of " + count + " partitions hold rows · hover a cell for detail")),
-      h("div", { className: "pcells" }, cells));
+    return h(Plot, {
+      className: "loadbar",
+      data: [{
+        x: x, y: props.loads, type: "bar",
+        marker: { color: fill, cornerradius: 3, line: { width: 0 } },
+        hovertemplate: "p%{x} · <b>%{y:,} rows</b><extra></extra>"
+      }],
+      layout: {
+        bargap: props.loads.length > 40 ? 0.12 : 0.28,
+        margin: { l: 40, r: 8, t: 6, b: 14 },
+        paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "IBM Plex Sans, sans-serif", size: 10, color: tok.fg3 },
+        xaxis: { showticklabels: false, showgrid: false, zeroline: false,
+                 linecolor: tok.line, fixedrange: true },
+        /* explicit ticks so both charts label identically, and so billions read
+           as "B" like everywhere else rather than Plotly's SI "G" */
+        yaxis: { range: [0, props.max * 1.06], tickmode: "array",
+                 tickvals: [0, props.max / 2, props.max],
+                 ticktext: [0, props.max / 2, props.max].map(function (v) { return compact(v); }),
+                 gridcolor: tok.line, zerolinecolor: tok.line, fixedrange: true,
+                 tickfont: { size: 10, color: tok.fg3 } }
+      }
+    });
   }
 
   function PartitionMap(props) {
-    var cfg = props.cfg, sim = props.sim;
+    var cfg = props.cfg, sim = props.sim, tok = props.tok;
+    var peakB = Math.max.apply(null, sim.noSalt);
+    var peakA = Math.max.apply(null, sim.salted);
+    var shared = Math.max(peakB, peakA, 1);
     /* at high skew the long-tail values round down to no rows at all, so they
        reach no partition — worth saying outright, since it looks like a bug */
     var withRows = sim.counts.filter(function (c) { return c > 0; }).length;
     var extra = cfg.V + " values" + (withRows < cfg.V ? ", only " + withRows + " with rows" : "");
+    var busyB = sim.noSalt.filter(function (v) { return v > 0; }).length;
+    var busyA = sim.salted.filter(function (v) { return v > 0; }).length;
     return h("section", { className: "card", style: { padding: "16px" } },
       h("div", { className: "sec-head" },
-        h("h2", null, "Partition map"),
-        h("span", { className: "note" }, "pmod(hash(key), partitions) — every partition, filled or not")),
-      h("div", { className: "pmap" },
-        h(PartitionRow, { label: "Before salting", tone: "before", loads: sim.noSalt,
-                          count: cfg.PB, valuesAt: sim.valuesAt, extra: extra }),
-        h(PartitionRow, { label: "After salting", tone: "after", loads: sim.salted,
-                          count: cfg.P, valuesAt: null })));
+        h("h2", null, "Load per partition"),
+        h("span", { className: "note" }, "pmod(hash(key), partitions) · deeper blue is a heavier partition")),
+      h("div", { className: "loadpair" },
+        h("div", { className: "prow before" },
+          h("div", { className: "plab" }, "Before salting",
+            h("span", { className: "psub" },
+              "peak " + compact(peakB) + " rows · " + busyB + " of " + cfg.PB + " busy" +
+              (withRows < cfg.V ? " · only " + withRows + " of " + cfg.V + " values have rows" : ""))),
+          h(LoadBars, { loads: sim.noSalt, max: shared, tok: tok })),
+        h("div", { className: "prow after" },
+          h("div", { className: "plab" }, "After salting",
+            h("span", { className: "psub" },
+              "peak " + compact(peakA) + " rows · " + busyA + " of " + cfg.P + " busy · same scale")),
+          h(LoadBars, { loads: sim.salted, max: shared, tok: tok }))));
   }
 
   /* ---------- before / after flow ---------- */
@@ -454,12 +676,14 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
       for (i = 0; i < cfg.PB; i++) { if (sim.noSalt[i] > 0) { bIdx[i] = beforeUsed.length; beforeUsed.push(i); } }
       for (i = 0; i < cfg.P; i++) { if (sim.salted[i] > 0) { aIdx[i] = afterUsed.length; afterUsed.push(i); } }
       var off = beforeUsed.length, nb = beforeUsed.length, na = afterUsed.length;
-      var src = [], tgt = [], val = [], lcol = [], lcd = [];
+      var src = [], tgt = [], val = [], lcol = [], lcd = [], lt = [];
       Object.keys(sim.flows).forEach(function (k) {
         var pair = k.split(":"), b = +pair[0], a = +pair[1];
         if (!(b in bIdx) || !(a in aIdx)) { return; }
+        var t = nb <= 1 ? 0.5 : bIdx[b] / (nb - 1);
         src.push(bIdx[b]); tgt.push(off + aIdx[a]); val.push(sim.flows[k]);
-        lcol.push(ramp(bIdx[b], nb, 0.62));
+        lt.push(t);
+        lcol.push(rampT(t, LINK_BASE));
         lcd.push("p" + b + " → p" + a);
       });
 
@@ -490,10 +714,30 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
         return "p" + p + " · " + vs.length + (vs.length === 1 ? " value: " : " values: ") + head;
       }).concat(afterUsed.map(function (p) { return "p" + p; }));
 
-      var ncol = beforeUsed.map(function (_, j) { return ramp(j, nb); })
-                 .concat(afterUsed.map(function () { return SINK_COLOR; }));
+      /* An after-node takes the blend of the ribbons feeding it, weighted by
+         rows. The blend is averaged along the palette ramp rather than in RGB,
+         so the result is always a colour on the same ramp and never goes muddy
+         however many sources mix into it. */
+      var wAcc = [], wSum = [], j2;
+      for (j2 = 0; j2 < na; j2++) { wAcc.push(0); wSum.push(0); }
+      for (j2 = 0; j2 < src.length; j2++) {
+        var aj = tgt[j2] - off;
+        wAcc[aj] += val[j2] * (nb <= 1 ? 0.5 : src[j2] / (nb - 1));
+        wSum[aj] += val[j2];
+      }
+      /* palette position per node, so any alpha can be rebuilt on the fly */
+      var nt = beforeUsed.map(function (_, j) { return nb <= 1 ? 0.5 : j / (nb - 1); })
+               .concat(afterUsed.map(function (_, j) { return wSum[j] ? wAcc[j] / wSum[j] : 0.5; }));
+      var ncol = nt.map(function (t) { return rampT(t); });
+
+      /* who touches whom, for isolating a node's flows on click */
+      var nbrs = [], q;
+      for (q = 0; q < nt.length; q++) { nbrs.push({}); }
+      for (q = 0; q < src.length; q++) { nbrs[src[q]][tgt[q]] = 1; nbrs[tgt[q]][src[q]] = 1; }
+
       return { shown: shown, full: full, custom: custom, ncol: ncol, src: src, tgt: tgt, val: val,
-               lcol: lcol, lcd: lcd, nb: nb, na: na, links: val.length, height: height, pad: pad,
+               lcol: lcol, lcd: lcd, lt: lt, nt: nt, nbrs: nbrs,
+               nb: nb, na: na, links: val.length, height: height, pad: pad,
                hidden: hiddenCount, biggest: biggest };
     }, [cfg.PB, cfg.P, cfg.N, sim]);
 
@@ -503,7 +747,8 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
       h("div", { className: "sec-head" },
         h("h2", null, "Where the rows move"),
         h("span", { className: "note" },
-          "every node is a partition · " + model.links + " flows · ribbon width is rows" +
+          "click a partition to isolate it, again to clear · hover a ribbon to follow it · " +
+          model.links + " flows" +
           (model.hidden ? " · " + model.hidden + " label" + (model.hidden === 1 ? "" : "s") + " on hover only" : ""))),
       h("div", { className: "flowhead" },
         h("span", { className: "b" }, "Before salting",
@@ -511,14 +756,19 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
             cfg.V + " value" + (cfg.V === 1 ? "" : "s") + " landed on " + model.nb + " of " + cfg.PB +
             (model.biggest > 1 ? " · up to " + model.biggest + " sharing one partition" : ""))),
         h("span", { className: "a" }, "After salting")),
-      h(Plot, {
+      h(SankeyPlot, {
         className: "sankey",
         style: { height: height + "px" },
+        model: model,
         data: [{
-          type: "sankey", orientation: "h", arrangement: "snap",
+          /* "fixed" rather than "snap": draggable nodes swallow the click, and
+             dragging them around serves nothing here */
+          type: "sankey", orientation: "h", arrangement: "fixed",
           node: {
             pad: model.pad, thickness: 13, line: { width: 0 },
             label: model.shown, customdata: model.custom, color: model.ncol,
+            /* labels stay neutral so the coloured block beside them carries identity */
+            textfont: { family: "IBM Plex Mono, monospace", size: 11, color: tok.fg2 },
             hovertemplate: "%{customdata} · <b>%{value:,} rows</b><extra></extra>"
           },
           link: {
@@ -528,51 +778,12 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
           }
         }],
         layout: {
+          /* state the height instead of letting Plotly infer it from the
+             container, so the SVG and the box can never disagree */
+          height: height,
           margin: { l: 6, r: 6, t: 6, b: 6 },
           paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
           font: { family: "IBM Plex Mono, monospace", size: 11, color: tok.fg2 }
-        }
-      }),
-      h("div", { className: "tstrip" },
-        h("div", { className: "tstep" },
-          h("div", { className: "t1" }, "1 · key"), h("div", { className: "t2" }, "value")),
-        h("span", { className: "arw" }, "→"),
-        h("div", { className: "tstep" },
-          h("div", { className: "t1" }, "2 · add salt"),
-          h("div", { className: "t2" }, "0–" + (cfg.S - 1) + " round-robin")),
-        h("span", { className: "arw" }, "→"),
-        h("div", { className: "tstep" },
-          h("div", { className: "t1" }, "3 · hash"),
-          h("div", { className: "t2" }, "murmur3(value_salt)")),
-        h("span", { className: "arw" }, "→"),
-        h("div", { className: "tstep" },
-          h("div", { className: "t1" }, "4 · route"),
-          h("div", { className: "t2" }, "pmod(h, " + cfg.P + ")"))));
-  }
-
-  /* ---------- rows per value ---------- */
-  function RowsPerValue(props) {
-    var cfg = props.cfg, sim = props.sim, tok = props.tok;
-    var labels = [];
-    for (var i = 0; i < cfg.V; i++) { labels.push(String(i + 1)); }
-    return h("section", { className: "card", style: { padding: "14px 14px 6px" } },
-      h("div", { className: "sec-head" },
-        h("h2", null, "Rows per value"),
-        h("span", { className: "note" }, "the skew you dialled in, before any partitioning")),
-      h(Plot, {
-        className: "plot",
-        data: [{ x: labels, y: sim.counts, type: "bar", marker: { color: tok.hot },
-                 hovertemplate: "value %{x} · <b>%{y:,} rows</b><extra></extra>" }],
-        layout: {
-          bargap: cfg.V > 60 ? 0.08 : 0.3,
-          margin: { l: 58, r: 14, t: 10, b: 42 },
-          paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
-          font: { family: "IBM Plex Sans, sans-serif", size: 12, color: tok.fg2 },
-          xaxis: { type: "category", tickfont: { size: 11, color: tok.fg3 }, showgrid: false,
-                   linecolor: tok.line, automargin: true, nticks: 20,
-                   title: { text: "value", font: { size: 11, color: tok.fg3 } } },
-          yaxis: { tickfont: { size: 11, color: tok.fg3 }, gridcolor: tok.line, zerolinecolor: tok.line,
-                   tickformat: "~s", rangemode: "tozero", automargin: true }
         }
       }));
   }
@@ -591,6 +802,8 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
     var cfg = props.cfg;
     var v = useState({ x: 0, y: 0, k: 1 }), view = v[0], setView = v[1];
     var d = useState(false), dragging = d[0], setDragging = d[1];
+    /* reference material rather than a live read-out, so it starts folded away */
+    var o = useState(false), open = o[0], setOpen = o[1];
     var holdRef = useRef(null), drag = useRef(null);
 
     useEffect(function () {
@@ -689,9 +902,15 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
     flow(352, rowY(saltsShown - 1) + 24, 580, joinY + 4, "jl");
     flow(1105, rowY(Math.min(3, cfg.V) - 1) + 24, 700, joinY + 4, "jr");
 
-    return h("section", { className: "card", style: { padding: "16px" } },
-      h("div", { className: "sec-head" },
-        h("h2", null, "The pipeline"),
+    return h("section", { className: "card" },
+      h("button", { className: "panel-head", "aria-expanded": open ? "true" : "false",
+                    "aria-controls": "pipeBody", onClick: function () { setOpen(!open); } },
+        h("span", { className: "chev" + (open ? "" : " closed"), "aria-hidden": "true" }, "▼"),
+        "How salting works",
+        h("span", { className: "tally" }, "diagram and notes")),
+      h("div", { className: "panel-body", id: "pipeBody", hidden: !open },
+      h("div", { className: "sec-head", style: { marginTop: "12px" } },
+        h("h2", null, "Row by row"),
         h("span", { className: "note" }, "drag to pan · ctrl + scroll, or the buttons, to zoom")),
       h("div", { className: "canvas-bar" },
         h("button", { className: "zbtn", onClick: function () { zoomBy(1.25); }, "aria-label": "Zoom in" }, "+"),
@@ -722,7 +941,22 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
               h("rect", { width: 160, height: 46, rx: 8 }),
               h("text", { x: 80, y: 28, textAnchor: "middle" }, "JOIN")),
             h("text", { className: "cap", x: 640, y: 508, textAnchor: "middle" },
-              "on value AND salt — " + cfg.V + " values × " + S + " salts = " + (cfg.V * S) + " keys over " + P + " partitions")))));
+              "on value AND salt — " + cfg.V + " values × " + S + " salts = " + (cfg.V * S) + " keys over " + P + " partitions")))),
+      h("div", { className: "foot" },
+        h("p", null, h("b", null, "Join on the salted key."), " Big side: ",
+          h("code", null, "withColumn(\"salt\", pmod(monotonically_increasing_id(), lit(S)))"),
+          ". Small side: ", h("code", null, "withColumn(\"salt\", explode(sequence(lit(0), lit(S - 1))))"),
+          ". Then join on ", h("code", null, "value"), " and ", h("code", null, "salt"),
+          " together. Skip the explode and the salted rows match nothing."),
+        h("p", null, h("b", null, "The salt range is a trade."),
+          " It multiplies the small side by S, so a wide salt range buys even partitions at the cost of a bigger broadcast or shuffle on the other side."),
+        h("p", null, h("b", null, "Picking a shuffle partition count."),
+          " Divide the stage's shuffle size by a 100–200MB target, then round to a multiple of your total executor cores so none sit idle on the last wave. Spark's default of 200 is a historical constant, not a recommendation. Matching the count to the number of distinct values does not work: hashing still collides, so some partitions take several keys and others none — the partition map above shows it. With AQE on, set it generously and let ",
+          h("code", null, "spark.sql.adaptive.coalescePartitions.enabled"),
+          " shrink it to fit the data at runtime."),
+        h("p", null, h("b", null, "Before reaching for salt,"), " try AQE — ",
+          h("code", null, "spark.sql.adaptive.skewJoin.enabled"),
+          " splits skewed partitions on its own, and a broadcast join avoids the shuffle entirely when one side fits in memory."))));
   }
 
   /* ---------- app ---------- */
@@ -779,8 +1013,10 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
       h("header", null,
         h("p", { className: "eyebrow" }, "Spark shuffle partitioning"),
         h("h1", null, "Salt Lab"),
-        h("p", { className: "sub" },
-          "Build a skewed dataset, watch it collapse onto a few partitions, then add a salt and watch the load spread. Every partition here is computed with Spark's own hash: MurmurHash3 x86-32, seed 42.")),
+        h("div", { className: "titlerow" },
+          h("p", { className: "sub" },
+            "Build a skewed dataset, watch it collapse onto a few partitions, then add a salt and watch the load spread. Every partition here is computed with Spark's own hash: MurmurHash3 x86-32, seed 42."),
+          h(TransformStrip, { cfg: cfg }))),
       h(ConfigPanel, { raw: raw, cfg: cfg, set: set, setRaw: setRaw, topShare: topShare }),
       h(Metrics, { cfg: cfg, sim: sim }),
       distinct < cfg.P * 2
@@ -789,25 +1025,9 @@ input[type="range"] { width: 100%; accent-color: var(--cool); margin: 0; }
             h("span", null, cfg.V + " values × " + cfg.S + " salts gives " + distinct +
               " distinct keys for " + cfg.P + " partitions. Raise the salt range until there are at least a few keys per partition."))
         : null,
-      h(PartitionMap, { cfg: cfg, sim: sim }),
+      h(PartitionMap, { cfg: cfg, sim: sim, tok: tok }),
       h(FlowSankey, { cfg: cfg, sim: sim, tok: tok }),
-      h(RowsPerValue, { cfg: cfg, sim: sim, tok: tok }),
-      h(PipelineCanvas, { cfg: cfg }),
-      h("section", { className: "foot" },
-        h("p", null, h("b", null, "Join on the salted key."), " Big side: ",
-          h("code", null, "withColumn(\"salt\", pmod(monotonically_increasing_id(), lit(S)))"),
-          ". Small side: ", h("code", null, "withColumn(\"salt\", explode(sequence(lit(0), lit(S - 1))))"),
-          ". Then join on ", h("code", null, "value"), " and ", h("code", null, "salt"),
-          " together. Skip the explode and the salted rows match nothing."),
-        h("p", null, h("b", null, "The salt range is a trade."),
-          " It multiplies the small side by S, so a wide salt range buys even partitions at the cost of a bigger broadcast or shuffle on the other side."),
-        h("p", null, h("b", null, "Picking a shuffle partition count."),
-          " Divide the stage's shuffle size by a 100–200MB target, then round to a multiple of your total executor cores so none sit idle on the last wave. Spark's default of 200 is a historical constant, not a recommendation. Matching the count to the number of distinct values does not work: hashing still collides, so some partitions take several keys and others none — the partition map above shows it. With AQE on, set it generously and let ",
-          h("code", null, "spark.sql.adaptive.coalescePartitions.enabled"),
-          " shrink it to fit the data at runtime."),
-        h("p", null, h("b", null, "Before reaching for salt,"), " try AQE — ",
-          h("code", null, "spark.sql.adaptive.skewJoin.enabled"),
-          " splits skewed partitions on its own, and a broadcast join avoids the shuffle entirely when one side fits in memory.")));
+      h(PipelineCanvas, { cfg: cfg }));
   }
 
   function mount(initial) {
