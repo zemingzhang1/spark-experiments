@@ -1,0 +1,7 @@
+*(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74, test_column_1 AS test_column_1#327, split(birthday#70, /, -1)[2] AS birth_year#328]
++- InMemoryTableScan [age#68, birthday#70, city#72, cust_id#66, customer_group#74, gender#69, name#67, zip#71]
+      +- InMemoryRelation [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74], StorageLevel(disk, memory, deserialized, 1 replicas)
+            +- *(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, CASE WHEN ((cast(age#68 as bigint) >= 20) AND (cast(age#68 as bigint) <= 30)) THEN young WHEN ((cast(age#68 as bigint) >= 31) AND (cast(age#68 as bigint) <= 50)) THEN mid WHEN (cast(age#68 as bigint) > 51) THEN old ELSE kid END AS customer_group#74]
+               +- *(1) Filter (isnotnull(city#72) AND (city#72 = boston))
+                  +- *(1) ColumnarToRow
+                     +- FileScan parquet [cust_id#66,name#67,age#68,gender#69,birthday#70,zip#71,city#72] Batched: true, DataFilters: [isnotnull(city#72), (city#72 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>

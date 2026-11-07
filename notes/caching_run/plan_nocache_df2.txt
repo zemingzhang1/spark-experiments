@@ -1,0 +1,4 @@
+*(1) Project [cust_id#0, name#1, age#2, gender#3, birthday#4, zip#5, city#6, CASE WHEN ((cast(age#2 as bigint) >= 20) AND (cast(age#2 as bigint) <= 30)) THEN young WHEN ((cast(age#2 as bigint) >= 31) AND (cast(age#2 as bigint) <= 50)) THEN mid WHEN (cast(age#2 as bigint) > 51) THEN old ELSE kid END AS customer_group#8, test_column_2 AS test_column_2#11, split(birthday#4, /, -1)[1] AS birth_month#12]
++- *(1) Filter (isnotnull(city#6) AND (city#6 = boston))
+   +- *(1) ColumnarToRow
+      +- FileScan parquet [cust_id#0,name#1,age#2,gender#3,birthday#4,zip#5,city#6] Batched: true, DataFilters: [isnotnull(city#6), (city#6 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>

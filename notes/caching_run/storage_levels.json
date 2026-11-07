@@ -1,0 +1,50 @@
+[
+  {
+    "level": "MEMORY_AND_DISK_DESER  <- .cache() default",
+    "repr": "Disk Memory Deserialized 1x Replicated",
+    "memory_bytes": 297224,
+    "disk_bytes": 0,
+    "storageLevel": "Disk Memory Deserialized 1x Replicated",
+    "partitions": 1
+  },
+  {
+    "level": "MEMORY_ONLY",
+    "repr": "Memory Serialized 1x Replicated",
+    "memory_bytes": 168815,
+    "disk_bytes": 0,
+    "storageLevel": "Memory Serialized 1x Replicated",
+    "partitions": 1
+  },
+  {
+    "level": "MEMORY_ONLY_2",
+    "repr": "Memory Serialized 2x Replicated",
+    "memory_bytes": 168815,
+    "disk_bytes": 0,
+    "storageLevel": "Memory Serialized 2x Replicated",
+    "partitions": 1
+  },
+  {
+    "level": "MEMORY_AND_DISK",
+    "repr": "Disk Memory Serialized 1x Replicated",
+    "memory_bytes": 168815,
+    "disk_bytes": 0,
+    "storageLevel": "Disk Memory Serialized 1x Replicated",
+    "partitions": 1
+  },
+  {
+    "level": "DISK_ONLY",
+    "repr": "Disk Serialized 1x Replicated",
+    "memory_bytes": 0,
+    "disk_bytes": 168815,
+    "storageLevel": "Disk Serialized 1x Replicated",
+    "partitions": 1
+  },
+  {
+    "level": "DISK_ONLY_3",
+    "repr": "Disk Serialized 3x Replicated",
+    "memory_bytes": 0,
+    "disk_bytes": 168815,
+    "storageLevel": "Disk Serialized 3x Replicated",
+    "partitions": 1
+  }
+]

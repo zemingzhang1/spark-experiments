@@ -1,0 +1,123 @@
+Spark version : 4.3.0
+Spark UI      : http://localhost:4040
+Application   : local-1794084830668
+Cores         : 12
+
+==============================================================================
+PART 1 - THE NOTEBOOK, WITH AND WITHOUT cache()
+==============================================================================
+
+--- A: no cache ---
+*(1) Project [cust_id#0, name#1, age#2, gender#3, birthday#4, zip#5, city#6, CASE WHEN ((cast(age#2 as bigint) >= 20) AND (cast(age#2 as bigint) <= 30)) THEN young WHEN ((cast(age#2 as bigint) >= 31) AND (cast(age#2 as bigint) <= 50)) THEN mid WHEN (cast(age#2 as bigint) > 51) THEN old ELSE kid END AS customer_group#8, test_column_1 AS test_column_1#9, split(birthday#4, /, -1)[2] AS birth_year#10]
++- *(1) Filter (isnotnull(city#6) AND (city#6 = boston))
+   +- *(1) ColumnarToRow
+      +- FileScan parquet [cust_id#0,name#1,age#2,gender#3,birthday#4,zip#5,city#6] Batched: true, DataFilters: [isnotnull(city#6), (city#6 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>
+
+
+*(1) Project [cust_id#0, name#1, age#2, gender#3, birthday#4, zip#5, city#6, CASE WHEN ((cast(age#2 as bigint) >= 20) AND (cast(age#2 as bigint) <= 30)) THEN young WHEN ((cast(age#2 as bigint) >= 31) AND (cast(age#2 as bigint) <= 50)) THEN mid WHEN (cast(age#2 as bigint) > 51) THEN old ELSE kid END AS customer_group#8, test_column_2 AS test_column_2#11, split(birthday#4, /, -1)[1] AS birth_month#12]
++- *(1) Filter (isnotnull(city#6) AND (city#6 = boston))
+   +- *(1) ColumnarToRow
+      +- FileScan parquet [cust_id#0,name#1,age#2,gender#3,birthday#4,zip#5,city#6] Batched: true, DataFilters: [isnotnull(city#6), (city#6 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>
+
+
+--- B: df_base.cache() ---
+  storageLevel right after .cache(), before any action: Disk Memory Deserialized 1x Replicated
+  storageLevel after the first action                 : Disk Memory Deserialized 1x Replicated
+*(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74, test_column_1 AS test_column_1#327, split(birthday#70, /, -1)[2] AS birth_year#328]
++- InMemoryTableScan [age#68, birthday#70, city#72, cust_id#66, customer_group#74, gender#69, name#67, zip#71]
+      +- InMemoryRelation [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74], StorageLevel(disk, memory, deserialized, 1 replicas)
+            +- *(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, CASE WHEN ((cast(age#68 as bigint) >= 20) AND (cast(age#68 as bigint) <= 30)) THEN young WHEN ((cast(age#68 as bigint) >= 31) AND (cast(age#68 as bigint) <= 50)) THEN mid WHEN (cast(age#68 as bigint) > 51) THEN old ELSE kid END AS customer_group#74]
+               +- *(1) Filter (isnotnull(city#72) AND (city#72 = boston))
+                  +- *(1) ColumnarToRow
+                     +- FileScan parquet [cust_id#66,name#67,age#68,gender#69,birthday#70,zip#71,city#72] Batched: true, DataFilters: [isnotnull(city#72), (city#72 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>
+
+
+*(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74, test_column_2 AS test_column_2#329, split(birthday#70, /, -1)[1] AS birth_month#330]
++- InMemoryTableScan [age#68, birthday#70, city#72, cust_id#66, customer_group#74, gender#69, name#67, zip#71]
+      +- InMemoryRelation [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, customer_group#74], StorageLevel(disk, memory, deserialized, 1 replicas)
+            +- *(1) Project [cust_id#66, name#67, age#68, gender#69, birthday#70, zip#71, city#72, CASE WHEN ((cast(age#68 as bigint) >= 20) AND (cast(age#68 as bigint) <= 30)) THEN young WHEN ((cast(age#68 as bigint) >= 31) AND (cast(age#68 as bigint) <= 50)) THEN mid WHEN (cast(age#68 as bigint) > 51) THEN old ELSE kid END AS customer_group#74]
+               +- *(1) Filter (isnotnull(city#72) AND (city#72 = boston))
+                  +- *(1) ColumnarToRow
+                     +- FileScan parquet [cust_id#66,name#67,age#68,gender#69,birthday#70,zip#71,city#72] Batched: true, DataFilters: [isnotnull(city#72), (city#72 = boston)], Format: Parquet, Location: InMemoryFileIndex(1 paths)[file:/F:/Projects/spark-experiments/data/data_skew/customers.parquet/p..., PartitionFilters: [], PushedFilters: [IsNotNull(city), EqualTo(city,boston)], ReadSchema: struct<cust_id:string,name:string,age:string,gender:string,birthday:string,zip:string,city:string>
+
+
+--- plan diff, counted ---
+  NO CACHE  Scan parquet       df1=1 df2=1
+  NO CACHE  Filter (city)      df1=1 df2=1
+  NO CACHE  CASE WHEN rebuilt  df1=1 df2=1
+  NO CACHE  InMemoryTableScan  df1=0 df2=0
+  CACHED    Scan parquet       df1=1 df2=1
+  CACHED    Filter (city)      df1=1 df2=1
+  CACHED    CASE WHEN rebuilt  df1=1 df2=1
+  CACHED    InMemoryTableScan  df1=1 df2=1
+
+==============================================================================
+PART 2 - A BASE EXPENSIVE ENOUGH TO FEEL (871 MB, one shuffle)
+==============================================================================
+  transactions part-files: 163
+
+--- A: no cache (the groupBy shuffle runs twice) ---
+  two consumers, no cache            (535443327.91, 10) wall=   3.19s
+
+--- B: base.cache() (the groupBy shuffle runs once) ---
+  fill the cache (first action)      24699        wall=   1.70s
+  two consumers, cached              (535443327.91, 10) wall=   0.51s
+
+--- verdict ---
+  no cache                        :    3.19s
+  cache fill + two consumers      :    2.22s  (1.70 + 0.51)
+  second-and-later reads          :    0.51s vs    3.19s uncached
+  speed-up on the reuse           : 6.2x
+  cached base in memory           : 869,976 bytes across 32 partitions
+
+==============================================================================
+PART 3 - WHAT EACH StorageLevel ACTUALLY COSTS
+==============================================================================
+  (same DataFrame every time: the customers parquet, 5,000 rows)
+
+  level                                           mem bytes   disk bytes  as the UI shows it
+  MEMORY_AND_DISK_DESER  <- .cache() default        297,224            0  Disk Memory Deserialized 1x Replicated
+  MEMORY_ONLY                                       168,815            0  Memory Serialized 1x Replicated
+  MEMORY_ONLY_2                                     168,815            0  Memory Serialized 2x Replicated
+  MEMORY_AND_DISK                                   168,815            0  Disk Memory Serialized 1x Replicated
+  DISK_ONLY                                               0      168,815  Disk Serialized 1x Replicated
+  DISK_ONLY_3                                             0      168,815  Disk Serialized 3x Replicated
+
+==============================================================================
+PART 4 - cache() vs persist()
+==============================================================================
+  df.cache()                            -> Disk Memory Deserialized 1x Replicated
+  df.persist()                          -> Disk Memory Deserialized 1x Replicated
+  df.persist(MEMORY_AND_DISK_DESER)     -> Disk Memory Deserialized 1x Replicated
+  df.persist(DISK_ONLY)                 -> Disk Serialized 1x Replicated
+  cache() == persist() == persist(MEMORY_AND_DISK_DESER)? True
+
+  re-persisting without unpersist first:
+    no error - level is now Disk Serialized 1x Replicated
+  after unpersist()                     -> Serialized 1x Replicated
+
+--- SQL tab, for the screenshots ---
+  id=0    showString at NativeMethodAccessorImpl.java:   1022ms
+  id=1    count at NativeMethodAccessorImpl.java:0       333ms
+  id=2    count at NativeMethodAccessorImpl.java:0       72ms
+  id=3    count at NativeMethodAccessorImpl.java:0       222ms
+  id=4    count at NativeMethodAccessorImpl.java:0       48ms
+  id=5    count at NativeMethodAccessorImpl.java:0       38ms
+  id=6    collect at F:\Projects\spark-experiments\scr   1766ms
+  id=7    count at NativeMethodAccessorImpl.java:0       1305ms
+  id=8    count at NativeMethodAccessorImpl.java:0       1700ms
+  id=9    collect at F:\Projects\spark-experiments\scr   173ms
+  id=10   count at NativeMethodAccessorImpl.java:0       316ms
+  id=11   count at NativeMethodAccessorImpl.java:0       72ms
+  id=12   count at NativeMethodAccessorImpl.java:0       70ms
+  id=13   count at NativeMethodAccessorImpl.java:0       56ms
+  id=14   count at NativeMethodAccessorImpl.java:0       47ms
+  id=15   count at NativeMethodAccessorImpl.java:0       50ms
+  id=16   count at NativeMethodAccessorImpl.java:0       47ms
+  id=17   count at NativeMethodAccessorImpl.java:0       50ms
+  id=18   count at NativeMethodAccessorImpl.java:0       44ms
+  id=19   count at <unknown>:0                           46ms
+  id=20   count at <unknown>:0                           45ms
+
+Artefacts written to F:\Projects\spark-experiments\notes\caching_run
+Spark UI held open on http://localhost:4040 for 900s
