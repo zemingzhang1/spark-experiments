@@ -22,6 +22,16 @@ This repository is the ultimate guide for mastering advanced Spark Performance T
 | Dynamic Partition Pruning                 | [![YouTube](https://img.shields.io/badge/YouTube-red?style=flat-square&logo=youtube)](https://youtu.be/s8Z8Gex7VFw) | [![Python](https://img.shields.io/badge/Code-Python-blue?style=flat-square&logo=python&logoColor=white)](/spark/5_1_dynamic_partition_pruning.ipynb) |
 
 
+## Salt Lab — interactive simulator
+
+[**Salt Lab**](https://me.zemingzhang.com/spark-salt-lab/) is an interactive companion to the data-skew chapters: dial in a skewed dataset, then watch the salt spread it across shuffle partitions. Partitions are not approximated — the page runs Spark's own `Murmur3_x86_32` with seed 42 and routes with `pmod(h, numPartitions)`.
+
+Source, build script and publishing notes: [`site/salt-lab/`](/site/salt-lab/). The page itself is generated from [`spark/1_data_skew/salting_simulator.html`](/spark/1_data_skew/salting_simulator.html).
+
+## Study Notes
+
+Annotated study-note PDFs for the chapters worked through so far — handwritten margin notes on the real notebook output, plus typed interview answers — live in [`notes/`](/notes/), with the measured runs they were built from alongside them.
+
 ## Contact
 
 - [LinkedIn](https://www.linkedin.com/in/afaque-ahmad-5a5847129/)

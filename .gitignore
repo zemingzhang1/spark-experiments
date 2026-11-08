@@ -34,4 +34,4 @@ spark/test
 
 scripts/pylibs/
 scripts/study_notes_caching/work/
-salt-lab-site/
+site/salt-lab/.deploy/
