@@ -24,7 +24,7 @@ This repository is the ultimate guide for mastering advanced Spark Performance T
 
 ## Salt Lab — interactive simulator
 
-[**Salt Lab**](https://me.zemingzhang.com/spark-salt-lab/) is an interactive companion to the data-skew chapters: dial in a skewed dataset, then watch the salt spread it across shuffle partitions. Partitions are not approximated — the page runs Spark's own `Murmur3_x86_32` with seed 42 and routes with `pmod(h, numPartitions)`.
+[**Salt Lab**](https://me.zemingzhang.com/spark-experiments/) is an interactive companion to the data-skew chapters: dial in a skewed dataset, then watch the salt spread it across shuffle partitions. Partitions are not approximated — the page runs Spark's own `Murmur3_x86_32` with seed 42 and routes with `pmod(h, numPartitions)`.
 
 Source, build script and publishing notes: [`site/salt-lab/`](/site/salt-lab/). The page itself is generated from [`spark/1_data_skew/salting_simulator.html`](/spark/1_data_skew/salting_simulator.html).
 

@@ -16,15 +16,17 @@ visitor's OS setting, and this page is meant to be seen dark.
 Layout:
 
     spark/1_data_skew/salting_simulator.html   the source, edited in the artifact
-    site/salt-lab/index.html                   generated, tracked here
-    site/salt-lab/.deploy/                     clone of zemingzhang1/spark-salt-lab,
-                                               git-ignored; --push copies index.html
-                                               in and pushes it
+    site/salt-lab/index.html                   generated, tracked on main
+    gh-pages branch                            index.html + .nojekyll, nothing else
 
---push only touches the deploy clone, never this repository, and it refuses to
-run if that clone's origin is not the Pages repo. It is a no-op when the
-regenerated page is byte-identical to what is already published, so it is safe
-to run whenever you are unsure.
+--push builds a one-file commit straight onto `refs/heads/gh-pages` with git
+plumbing -- no checkout, no second clone, and the working tree is never touched.
+It pushes that one ref by name, so it cannot land on `main`. It is a no-op when
+the regenerated page already matches what is published.
+
+GitHub Pages serves that branch at https://me.zemingzhang.com/spark-experiments/
+(the custom domain is configured on zemingzhang1.github.io, so this project page
+inherits it).
 
 Pushing needs the zemingzhang1 account active in gh. That is held per-shell: run
 this from the PowerShell terminal where `gh auth status` lists that account as
@@ -33,7 +35,6 @@ active, not from a Git Bash shell, which may only see the other account.
 
 import io
 import os
-import shutil
 import subprocess
 import sys
 
@@ -41,9 +42,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SRC = os.path.join(REPO, "spark", "1_data_skew", "salting_simulator.html")
 OUT = os.path.join(HERE, "index.html")
-DEPLOY = os.path.join(HERE, ".deploy")
-DEPLOY_REMOTE = "https://github.com/zemingzhang1/spark-salt-lab.git"
-LIVE_URL = "https://me.zemingzhang.com/spark-salt-lab/"
+BRANCH = "gh-pages"
+LIVE_URL = "https://me.zemingzhang.com/spark-experiments/"
 
 # What the artifact skeleton provides and a static host does not.
 SHELL_HEAD = """<!doctype html>
@@ -68,45 +68,45 @@ SPLIT = '<div id="root"></div>'
 
 
 def git(*args, **kw):
-    """Run a git command in the deploy clone and return its stdout, or exit."""
-    cwd = kw.pop("cwd", DEPLOY)
-    r = subprocess.run(("git",) + args, cwd=cwd, capture_output=True, text=True)
+    """Run a git command in the repository and return its stdout, or exit."""
+    r = subprocess.run(("git",) + args, cwd=REPO, input=kw.get("input"),
+                       capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit("git %s failed:\n%s" % (" ".join(args), (r.stderr or r.stdout).strip()))
     return r.stdout.strip()
 
 
-def ensure_deploy():
-    """Make sure .deploy is a clone of the Pages repo - and nothing else.
-
-    The deploy clone is the only thing --push is allowed to commit to. Checking
-    its remote here is what stops a stray push landing in spark-experiments.
-    """
-    if not os.path.isdir(os.path.join(DEPLOY, ".git")):
-        print("cloning the Pages repo into %s ..." % os.path.normpath(DEPLOY))
-        r = subprocess.run(["git", "clone", "-q", DEPLOY_REMOTE, DEPLOY])
-        if r.returncode != 0:
-            sys.exit("could not clone " + DEPLOY_REMOTE)
-    url = git("remote", "get-url", "origin")
-    if url.rstrip("/").removesuffix(".git") != DEPLOY_REMOTE.rstrip("/").removesuffix(".git"):
-        sys.exit("refusing to publish: %s points at %s, not %s"
-                 % (os.path.normpath(DEPLOY), url, DEPLOY_REMOTE))
+def published_sha():
+    """Blob sha of index.html as currently published, or '' if there is none."""
+    r = subprocess.run(["git", "ls-tree", "origin/" + BRANCH, "index.html"],
+                       cwd=REPO, capture_output=True, text=True)
+    parts = r.stdout.split()
+    return parts[2] if r.returncode == 0 and len(parts) >= 3 else ""
 
 
 def push():
-    """Copy the generated page into the deploy clone and push, if it changed."""
-    ensure_deploy()
-    git("fetch", "-q", "origin")
-    git("checkout", "-q", "main")
-    git("reset", "-q", "--hard", "origin/main")
-    shutil.copyfile(OUT, os.path.join(DEPLOY, "index.html"))
-    if not git("status", "--porcelain", "--", "index.html"):
+    """Commit the generated page onto gh-pages and push, if it changed.
+
+    Built with plumbing rather than a checkout: nothing in the working tree
+    moves, and the push names one ref, so it can never reach main.
+    """
+    subprocess.run(["git", "fetch", "-q", "origin", BRANCH], cwd=REPO)
+    blob = git("hash-object", "-w", OUT)
+    if published_sha() == blob:
         print("push: the published page already matches, nothing to do")
         return
-    git("add", "index.html")
-    git("commit", "-q", "-m", "Rebuild page from the current artifact")
-    git("push", "-q", "origin", "HEAD:main")
-    print("push: published %s to %s" % (git("rev-parse", "--short", "HEAD"), DEPLOY_REMOTE))
+
+    nojekyll = git("hash-object", "-w", "--stdin", input="")
+    tree = git("mktree", input="100644 blob %s\t.nojekyll\n100644 blob %s\tindex.html\n"
+                               % (nojekyll, blob))
+    parent = subprocess.run(["git", "rev-parse", "--verify", "-q", "origin/" + BRANCH],
+                            cwd=REPO, capture_output=True, text=True).stdout.strip()
+    args = ["commit-tree", tree]
+    if parent:
+        args += ["-p", parent]
+    commit = git(*args, input="Publish Salt Lab from site/salt-lab/index.html\n")
+    git("push", "-q", "origin", "%s:refs/heads/%s" % (commit, BRANCH))
+    print("push: published %s to %s" % (commit[:9], BRANCH))
     print("      Pages takes a few minutes, then %s updates" % LIVE_URL)
 
 

@@ -3,7 +3,7 @@
 An interactive simulator for Spark data skew and the salting fix. Dial in a
 skewed dataset, then watch the salt spread it across shuffle partitions.
 
-**Live page:** https://me.zemingzhang.com/spark-salt-lab/
+**Live page:** https://me.zemingzhang.com/spark-experiments/
 
 Companion to [`spark/1_data_skew/`](../../spark/1_data_skew/) — the notebooks
 show the skew and the fix in Spark; this page lets you feel the shape of it.
@@ -39,7 +39,7 @@ key distribution — so 5 billion rows costs the same as a thousand.
 | `spark/1_data_skew/salting_simulator.html` | **the source.** Edited in the Claude artifact, committed here |
 | `site/salt-lab/index.html` | generated page, wrapped in a real HTML document |
 | `site/salt-lab/build.py` | regenerates `index.html`, and publishes it with `--push` |
-| `site/salt-lab/.deploy/` | clone of `zemingzhang1/spark-salt-lab`, git-ignored |
+| `gh-pages` branch | what Pages serves: `index.html` and `.nojekyll`, nothing else |
 
 `index.html` is generated — don't hand-edit it. The artifact source starts at
 `<title>`, because the artifact platform supplies the doctype, charset, viewport
@@ -56,11 +56,14 @@ python site/salt-lab/build.py
 python site/salt-lab/build.py --push
 ```
 
-`--push` copies the generated page into `.deploy/` and pushes that clone to
-`zemingzhang1/spark-salt-lab`, which is the repository GitHub Pages serves. It
-never commits to this repository, it refuses to run if `.deploy/` points
-anywhere other than the Pages repo, and it is a no-op when the page has not
-changed. Pages takes a few minutes to rebuild afterwards.
+`--push` builds a one-file commit straight onto `refs/heads/gh-pages` using git
+plumbing — no checkout, no second clone, and your working tree is never touched,
+so you can publish mid-edit without stashing. It pushes that one ref by name, so
+it cannot land on `main`, and it is a no-op when the page has not changed. Pages
+takes a few minutes to rebuild afterwards.
+
+The `gh-pages` branch is generated. Don't edit it by hand; change the artifact,
+rebuild, push.
 
 Pushing needs the `zemingzhang1` account active in `gh` — that is held
 per-shell, so run it from the PowerShell terminal where `gh auth status` lists
@@ -69,6 +72,13 @@ that account as active.
 ## Hosting
 
 Static — no build step, no server. The custom domain `me.zemingzhang.com` is
-configured on `zemingzhang1.github.io`; `spark-salt-lab` is a project page, so
-it inherits the domain and is served from the `/spark-salt-lab/` path. React,
-Plotly and the fonts load from public CDNs over HTTPS.
+configured on `zemingzhang1.github.io`; this is a project page, so it inherits
+the domain and is served from the `/spark-experiments/` path. React, Plotly and
+the fonts load from public CDNs over HTTPS.
+
+Pages builds from the `gh-pages` branch, which holds only the page — that keeps
+the ~700 MB of parquet on `main` out of the published site.
+
+The lab previously lived at `me.zemingzhang.com/spark-salt-lab/`, served from a
+separate `zemingzhang1/spark-salt-lab` repository. That repository was retired
+once this branch was serving the same page.
